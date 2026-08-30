@@ -201,3 +201,67 @@ core feature within hours. Bump deliberately and re-run `docs-build --strict`.
 - `https://zensical.org/llms-full.txt` and `https://zensical.org/docs/sitemap.md` both 404.
 - Untested here: `mike` versioning, `zensical serve` live-reload against `src/`, and
   build behaviour on a real lab repo (liulab-data, liulab-genome, eutely).
+
+## Follow-up: docs_dir and unpublished subtrees
+
+**1. `docs_dir` is honoured.** Same literal key in both formats — `docs_dir: content/site`
+in `mkdocs.yml`, `docs_dir = "content/site"` under `[project]` in `zensical.toml`. Both
+built clean into `./site` **[tested]**. Two constraints, enforced at config load
+([config.py `_apply_defaults`](https://github.com/zensical/zensical/blob/master/python/zensical/config.py)):
+`docs_dir` must resolve *inside* the project root (so no `../`), and must differ from
+`site_dir`. That leaves any in-repo subdirectory layout available.
+
+**2. No mechanism exists today to keep a subtree out of the built site.** Every file under
+`docs_dir` is published, whether or not it appears in `nav` **[tested]**. Searching the
+source rather than the docs:
+
+- Front matter honoured by the Rust side is only `title`, `template`, `tags`
+  (`meta.get(...)` in `crates/zensical/src/structure/`); templates additionally read
+  `hide`, `description`, `author`, `location`. `hide:` suppresses UI chrome, not the page —
+  a `draft: true` + `hide:` page still emitted `site/drafts/draft/index.html` **[tested]**.
+- No `.pages` handling, no `not_in_nav`, no ignore/exclude/glob patterns, no per-directory
+  config anywhere in `crates/` or `python/`. The only `.gitignore` write is for the build
+  cache (`config.rs` `get_cache_dir`).
+- `awesome-nav` (`.pages`), `literate-nav` and `exclude` are all unimplemented backlog
+  items ([compatibility/plugins](https://zensical.org/compatibility/plugins/)); nothing
+  states what `exclude` will support.
+
+Only workaround: keep unpublished content outside `docs_dir`.
+
+**3. A missing `docs_dir` is a hard error**, not a warning: `Error: Docs directory does not
+exist: <abs path>`, exit 1, before any build work **[tested]**.
+
+## Follow-up: nav autogeneration and search visibility
+
+**1. Nav is auto-generated from the directory tree when `nav:` is absent.** With no `nav:`
+key, a three-page site produced a navbar containing `Home`, `guide/` *and*
+`adr/0001-manifest/` **[tested]**. So eutely's current "no explicit nav" setup would put
+`docs/adr/`, `docs/research/` and `docs/agents/` straight into the navbar.
+**The template must ship an explicit `nav:`.**
+([nav.rs `from(pages)`](https://github.com/zensical/zensical/blob/master/crates/zensical/src/structure/nav.rs)
+mirrors MkDocs' auto-population.)
+
+**2. A published page absent from `nav` IS indexed by default.** Adding the ADR produced a
+third entry in `site/search.json` with its body text searchable **[tested]** — exactly the
+"searching *manifest* surfaces an ADR" case.
+
+**3. Yes — `search: exclude: true` front matter works, and it is the fix.** Material's
+convention is honoured verbatim:
+
+```yaml
+---
+search:
+  exclude: true
+---
+```
+
+With it, the page dropped out of `search.json` entirely (2 items, body token absent);
+without it, 3 items **[tested]**. Implemented at
+[render.py L145-147](https://github.com/zensical/zensical/blob/master/python/zensical/markdown/render.py)
+(`if meta.get("search", {}).get("exclude", False): search_processor.data = []`).
+Block-level `data-search-exclude` via `attr_list` also works
+([extensions/search.py L146-148](https://github.com/zensical/zensical/blob/master/python/zensical/extensions/search.py)).
+
+Two residues: an excluded page still appears in `sitemap.xml` **[tested]**, so search
+engines will index it; and front matter does not remove it from an auto-generated navbar —
+only an explicit `nav:` does.
