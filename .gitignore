@@ -1,0 +1,12 @@
+.pixi/
+site/
+dist/
+build/
+styles/
+__pycache__/
+*.egg-info/
+.coverage
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.DS_Store
