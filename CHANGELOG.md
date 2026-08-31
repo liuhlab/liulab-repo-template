@@ -20,4 +20,4 @@ sets one.
   placeholder, cuts the lanes a new repo said it does not want, deletes the template's own
   files, and tags `v0.0.0`. It asks first about anything you have already edited.
 - The `dogfood` job, which renders this template for all three shapes on every pull
-  request and proves each new repo passes its own `pixi run check`.
+  request and proves each new repo passes its own checks and builds its own site.

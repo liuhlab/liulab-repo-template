@@ -9,8 +9,9 @@ goes with it, because a derived repo has nothing to render.
 
 The only seam that sees `init-repo` at all, since everything that skill does happens to a
 *copy*. For each rung: build a scratch repo, run `scripts/init_repo.py` with that rung's four
-answers, then hand the result to its OWN gate — `pixi run check` — and assert what the gate
-cannot see. The rendered repo's own gate is the assertion, so almost nothing is asserted here.
+answers, then hand the result to its OWN gates — `pixi run check` and the docs build — and
+assert what they cannot see. The rendered repo's own gate is the assertion, so almost nothing is
+asserted here.
 
 Two things about the scratch repo are deliberate:
 
@@ -149,7 +150,13 @@ def tracked_paths(stage: Path) -> list[str]:
 def check_placeholder(stage: Path) -> list[str]:
     """Grep the rendered repo: no tracked path, link target or file may name the placeholder."""
     problems: list[str] = []
-    for rel in tracked_paths(stage):
+    tracked = tracked_paths(stage)
+    # A grep over nothing passes. `git ls-files` reads the index, so a render that deleted
+    # without staging, or a repo with no commit, would leave this rule looking green.
+    for witness in ("pyproject.toml", "AGENTS.md"):
+        if witness not in tracked:
+            problems.append(f"{witness} is not tracked, so this grep read almost nothing")
+    for rel in tracked:
         path = stage / rel
         if PLACEHOLDER in rel:
             problems.append(f"{rel} still names the placeholder in its path")
@@ -211,6 +218,10 @@ def render(rung: Rung, parent: Path) -> None:
     manifest = ["--manifest-path", str(stage / "pyproject.toml")]
     run(["pixi", "install", "--locked", *manifest], stage, label="pixi install --locked")
     run(["pixi", "run", "--locked", *manifest, "check"], stage, label="pixi run check")
+    # The docs build is a job of its own in the rendered repo, and it is the only thing that
+    # reads `mkdocs.yml` and `docs/api.md` — both of which `init-repo` edits. `--strict` is in
+    # the task, so a reference to a module this rung deleted fails here.
+    run(["pixi", "run", "--locked", *manifest, "docs-build"], stage, label="pixi run docs-build")
     problems = check_placeholder(stage) + check_shape(rung, stage)
     if problems:
         raise RenderError("\n".join(f"    {problem}" for problem in problems))
