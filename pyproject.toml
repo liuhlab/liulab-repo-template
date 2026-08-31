@@ -69,9 +69,23 @@ markdownlint-cli2 = "*"
 [tool.pixi.feature.test.dependencies]
 pytest = "*"
 
-# The docs environment's contents land with the docs site (zensical, mkdocstrings). It is
-# declared empty here so the environment exists and solves.
+# zensical is pinned EXACTLY, not to a range. At 0.0.x nothing promises that 0.0.58 is
+# compatible, and 0.0.48 shipped a regression that broke search and was hotfixed hours
+# later. Bump it deliberately and re-run `docs-build`.
 [tool.pixi.feature.docs.dependencies]
+zensical = "==0.0.57"
+mkdocstrings-python = ">=2.0.7,<3"
+
+# These live on the `docs` feature, not in [tool.pixi.tasks], so they run in the `docs`
+# environment — the one place zensical is installed. `pixi run docs-build` finds them
+# there without an `-e` flag. The docs build is NOT a step of `check`: this environment is
+# the heaviest one, and it gets its own CI job for that reason.
+#
+# `serve` takes `--strict` but prints "Strict mode is currently unsupported" and ignores
+# it, so it is omitted. `--clean` matches the workflow zensical's own docs publish with.
+[tool.pixi.feature.docs.tasks]
+docs = "zensical serve"
+docs-build = "zensical build --clean --strict"
 
 # `default` takes `test` so pyright can resolve pytest when it type-checks `tests/`, and
 # deliberately does NOT take `docs`: the docs environment is the heaviest one and exists so

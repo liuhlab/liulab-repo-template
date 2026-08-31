@@ -1,0 +1,55 @@
+# The docs site. Built by zensical, which reads this file directly — there is no
+# `zensical.toml`, so the config stays portable back to mkdocs if the alpha goes wrong.
+# See docs/adr/0001-docs-site-on-zensical.md.
+#
+# These three carry the PLACEHOLDER identity on purpose. `init-repo` fills them from the
+# git remote, and until it does they contain `newpkg`, so the rename check already covers
+# them. A sibling repo publishes to a hostname that is not where the repo lives and
+# nothing noticed; a placeholder that must be renamed is the cheap fix.
+site_name: liulab-newpkg
+site_url: https://liuhlab.github.io/liulab-newpkg/
+repo_url: https://github.com/liuhlab/liulab-newpkg
+repo_name: liuhlab/liulab-newpkg
+site_description: "One line: what this repo is for. `init-repo` rewrites this."
+
+# The nav is EXPLICIT and lists only human-facing pages. Without it zensical builds the
+# navbar from the directory tree, which would put docs/adr/, docs/agents/ and
+# docs/research/ straight into the menu. It does nothing about search — that is what the
+# `search: exclude: true` front matter on those pages is for. Neither mechanism
+# substitutes for the other, and `exclude_docs:` is silently ignored, so both are needed.
+#
+# Add a human-facing page here when you write one. Never add a page under docs/adr/,
+# docs/agents/ or docs/research/: conformance rule 2 fails the build if you do.
+nav:
+  - Home: index.md
+  - API reference: api.md
+
+theme:
+  name: material
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          # `src/` is inside the repo, so zensical watches it and `zensical serve`
+          # rebuilds when a docstring changes.
+          paths: [src]
+          options:
+            docstring_style: numpy
+            separate_signature: true
+            show_signature_annotations: true
+            show_symbol_type_heading: true
+            show_root_heading: true
+            signature_crossrefs: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - toc:
+      permalink: true
