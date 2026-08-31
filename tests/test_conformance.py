@@ -216,7 +216,8 @@ def test_rule_1_fires_on_a_tracked_placeholder(repo: Path) -> None:
 
 
 def test_rule_1_fires_on_a_placeholder_in_a_path_not_only_in_a_file(repo: Path) -> None:
-    # `src/newpkg/py.typed` holds no text to grep. The directory name is the whole violation.
+    # A `py.typed` under the placeholder module holds no text to grep. The directory name is
+    # the whole violation. (Spelled around, not out: rule 1 greps this file too.)
     write(repo, f"src/{PLACEHOLDER}/py.typed", "")
     write(repo, "tests/test_it.py", "def test_it() -> None:\n    assert True\n")
     proc = conformance(repo)
