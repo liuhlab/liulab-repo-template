@@ -65,6 +65,10 @@ python-build = "*"
 # semantics, which would move the gate without anyone editing a rule.
 vale = "3.19.0.*"
 markdownlint-cli2 = "*"
+# `scripts/conformance.py` reads `mkdocs.yml` and the front matter of every agent-facing page,
+# so the DEFAULT environment needs a YAML parser. It goes here rather than on a feature because
+# conformance is a step of `check-static`, which runs in `default`.
+pyyaml = "*"
 
 [tool.pixi.feature.test.dependencies]
 pytest = "*"
@@ -111,9 +115,12 @@ build = "python -m build"
 # expands to repo-relative names and every section applies.
 vale = "vale ."
 markdownlint = "markdownlint-cli2"
+# The rules every Liu Lab repo keeps after it leaves the template. It reads
+# [tool.liulab.agent-docs] and [tool.liulab.waived] below.
+conformance = "python scripts/conformance.py"
 # The static step list exists HERE and nowhere else — `check.sh` takes it as arguments —
 # so the local gate and CI cannot drift. Adding a step is one more word on this line.
-check-static = "bash scripts/check.sh lint fmt-check typecheck vale markdownlint"
+check-static = "bash scripts/check.sh lint fmt-check typecheck vale markdownlint conformance"
 check = { depends-on = ["check-static", "test"] }
 
 # ============================== ruff ==============================
@@ -153,7 +160,11 @@ convention = "numpy"
 # ============================== pyright ==============================
 
 [tool.pyright]
-include = ["src", "tests"]
+# `scripts` and `skills` are in scope, not just the package. They were left out at first, which
+# made `skills/install.py` and `scripts/conformance.py` — the two files that CI and a conformance
+# rule EXECUTE — the only tracked Python nothing type-checked. Every one of these files is clean
+# at `standard` today, so the wider scope costs nothing and keeps the gate honest.
+include = ["src", "tests", "scripts", "skills"]
 exclude = ["**/__pycache__", "**/.pixi"]
 venvPath = ".pixi/envs"
 venv = "default"
@@ -171,5 +182,34 @@ xfail_strict = true
 filterwarnings = ["error"]
 
 # ============================== liulab ==============================
-# `[tool.liulab.agent-docs]` (the declared agent-facing set) and `[tool.liulab.waived]`
-# land with `scripts/conformance.py`.
+# Read by `scripts/conformance.py`. See its docstring for what each rule requires.
+
+# THE declared agent-facing set — one list, every consumer reads it. Two lists that must match
+# drifted once already and turned CI red on every open pull request.
+#
+# Keys are plain PATH PREFIXES matched against `git ls-files`, deliberately not globs:
+# reimplementing Vale's glob matcher would reproduce two known surprises, so `.vale.ini` is not
+# the source of truth either. A key ending in `/` matches everything under that directory; any
+# other key matches that path exactly.
+#
+# Values name the Vale Length rule that applies to those files, or `false` where none does.
+# Conformance rule 3 pairs each key with the `.vale.ini` section whose header spells it and
+# asserts the section turns that rule ON and every other Length rule OFF — asserting mere
+# presence would pass the exact config that once left ADRs checked by nothing.
+[tool.liulab.agent-docs]
+"AGENTS.md" = "LengthDoc"
+"CONTEXT.md" = "LengthDoc"
+"docs/agents/" = "LengthDoc"
+"skills/" = "LengthDoc"
+"docs/adr/" = "LengthAdr"
+"docs/research/" = false
+
+# Waivers. Keyed by RULE NAME, value the reason — per-rule, never per-file, because per-file
+# waivers grow into the second config this design just deleted. There is no expiry: every waiver
+# is printed on every run, green runs included, because an escape hatch that stops being visible
+# becomes permanent. `placeholder-rename` refuses to be waived; naming it here is itself a
+# failure. Length caps need no waiver, because the caps are dials in `styles/Lab/`.
+#
+#     [tool.liulab.waived]
+#     repo-shape = "docs-only repo; the notebooks under src/ are examples, not a package"
+[tool.liulab.waived]
