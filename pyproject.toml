@@ -86,6 +86,10 @@ fmt-check = "ruff format --check ."
 typecheck = "pyright"
 test = "pytest"
 build = "python -m build"
+# The static step list exists HERE and nowhere else — `check.sh` takes it as arguments —
+# so the local gate and CI cannot drift. Adding a step is one more word on this line.
+check-static = "bash scripts/check.sh lint fmt-check typecheck"
+check = { depends-on = ["check-static", "test"] }
 
 # ============================== ruff ==============================
 

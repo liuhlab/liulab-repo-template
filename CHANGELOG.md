@@ -10,3 +10,5 @@ sets one.
 ### Added
 
 - The placeholder package, the pixi workspace, and the three environments.
+- `scripts/check.sh`, the gate runner behind `pixi run check`: it runs every static step
+  concurrently and reports all failures, not just the first.
