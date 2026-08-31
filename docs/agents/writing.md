@@ -1,3 +1,8 @@
+---
+search:
+  exclude: true
+---
+
 # Writing rules
 
 Three rules. Two are checked by `vale` in `pixi run check`; the third is on you.

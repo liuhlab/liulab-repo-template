@@ -1,3 +1,8 @@
+---
+search:
+  exclude: true
+---
+
 # Issue tracker: GitHub
 
 Issues and PRDs live as GitHub issues on this repo. Use `gh`; it infers the repo from `git remote`.

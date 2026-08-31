@@ -1,3 +1,8 @@
+---
+search:
+  exclude: true
+---
+
 # GitHub template mechanics
 
 Research for liuhlab/liulab-repo-template#4, 2026-08-30. What `gh repo create

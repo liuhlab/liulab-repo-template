@@ -1,3 +1,8 @@
+---
+search:
+  exclude: true
+---
+
 # Vale setup for the repo template
 
 Resolves liuhlab/liulab-repo-template#3. Every claim below was run against Vale 3.19.0
