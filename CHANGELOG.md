@@ -14,3 +14,5 @@ sets one.
   concurrently and reports all failures, not just the first.
 - The writing gate: `vale` and `markdownlint` as steps of `check-static`, with the four
   `Lab` rules tracked in `styles/Lab/`.
+- The three workflows: `ci.yml` runs the gate on every pull request, `docs.yml` publishes
+  the site to `gh-pages`, and `release.yml` publishes to PyPI when a Release is published.
