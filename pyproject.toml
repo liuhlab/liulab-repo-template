@@ -1,0 +1,146 @@
+# ============================== project ==============================
+
+[project]
+name = "liulab-newpkg"
+description = "One line: what this repo is for. `init-repo` rewrites this."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.13"
+authors = [{ name = "Liu Lab" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+# hatch-vcs reads the newest git tag. Never add a `version` key here.
+dynamic = ["version"]
+dependencies = []
+
+[project.scripts]
+newpkg = "newpkg.cli:main"
+
+# ============================== build ==============================
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+# No `fallback-version`: it is a hand-written version string, which is the thing this
+# repo does not do. With no tag yet, setuptools-scm reports `0.1.devN+g<sha>`, and
+# `init-repo` pushes `v0.0.0` so a new repo does not read as if a release happened.
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/newpkg"]
+
+# ============================== pixi ==============================
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64"]
+
+[tool.pixi.pypi-dependencies]
+liulab-newpkg = { path = ".", editable = true }
+
+# Python is pinned HERE and nowhere else — there is no `py313` feature — so every
+# environment inherits one interpreter and nothing can claim a version it does not run.
+# `requires-python` above is the only other place a version appears.
+#
+# The static gate's tools go in this table too. Every environment inherits them; that is
+# the price of the single pin, and it is cheap because all three share a solve group.
+[tool.pixi.dependencies]
+python = "3.13.*"
+ruff = "*"
+# Pinned exactly: Pylance is pyright, so the editor and CI must give one verdict. Bumping
+# it is a deliberate, reviewed diff.
+pyright = "==1.1.411"
+python-build = "*"
+
+[tool.pixi.feature.test.dependencies]
+pytest = "*"
+
+# The docs environment's contents land with the docs site (zensical, mkdocstrings). It is
+# declared empty here so the environment exists and solves.
+[tool.pixi.feature.docs.dependencies]
+
+# `default` is the whole developer environment: it takes every feature, so one `pixi shell`
+# — and one editor language server — sees everything the tree imports. `test` and `docs`
+# are the lean ones a CI job installs. All three share a solve group, so a version cannot
+# differ between the suite, the site and the editor.
+[tool.pixi.environments]
+default = { features = ["test", "docs"], solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
+docs = { features = ["docs"], solve-group = "default" }
+
+# One task per gate step. `check` and `check-static` land with `scripts/check.sh`, which
+# runs the static steps concurrently and reports every failure rather than the first.
+[tool.pixi.tasks]
+lint = "ruff check ."
+fmt = "ruff format ."
+fmt-check = "ruff format --check ."
+typecheck = "pyright"
+test = "pytest"
+build = "python -m build"
+
+# ============================== ruff ==============================
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "scripts"]
+# No `target-version`. Ruff infers it from `requires-python`, so the linted version and
+# the installed version cannot disagree.
+extend-exclude = [".pixi", "site", "build", "dist"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "PT",  # flake8-pytest-style
+    "PTH", # flake8-use-pathlib
+    "N",   # pep8-naming
+    "D",   # pydocstyle (numpy convention, configured below)
+    "RUF", # ruff-specific
+]
+# E501: the formatter owns line length. D203/D213: incompatible with D211/D212.
+ignore = ["E501", "D203", "D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+
+# ============================== pyright ==============================
+
+[tool.pyright]
+include = ["src", "tests"]
+exclude = ["**/__pycache__", "**/.pixi"]
+venvPath = ".pixi/envs"
+venv = "default"
+# No `pythonVersion`: pyright takes it from the interpreter in the environment above.
+typeCheckingMode = "standard"
+useLibraryCodeForTypes = true
+reportMissingTypeStubs = "none"
+
+# ============================== pytest ==============================
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = ["error"]
+
+# ============================== liulab ==============================
+# `[tool.liulab.agent-docs]` (the declared agent-facing set) and `[tool.liulab.waived]`
+# land with `scripts/conformance.py`.
