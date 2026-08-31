@@ -60,6 +60,11 @@ ruff = "*"
 # it is a deliberate, reviewed diff.
 pyright = "==1.1.411"
 python-build = "*"
+# Pinned to the version the jargon map and the grade-11 readability number were measured
+# against (`docs/research/vale-setup-2026-08-30.md`). A minor bump can change the metric
+# semantics, which would move the gate without anyone editing a rule.
+vale = "3.19.0.*"
+markdownlint-cli2 = "*"
 
 [tool.pixi.feature.test.dependencies]
 pytest = "*"
@@ -86,9 +91,15 @@ fmt-check = "ruff format --check ."
 typecheck = "pyright"
 test = "pytest"
 build = "python -m build"
+# `.` and not an absolute path: vale matches its `.vale.ini` globs against the filename
+# exactly as passed, so an absolute path matches no section, raises no alert and exits 0 —
+# a gate that is silently switched off. pixi runs tasks from the workspace root, so `.`
+# expands to repo-relative names and every section applies.
+vale = "vale ."
+markdownlint = "markdownlint-cli2"
 # The static step list exists HERE and nowhere else — `check.sh` takes it as arguments —
 # so the local gate and CI cannot drift. Adding a step is one more word on this line.
-check-static = "bash scripts/check.sh lint fmt-check typecheck"
+check-static = "bash scripts/check.sh lint fmt-check typecheck vale markdownlint"
 check = { depends-on = ["check-static", "test"] }
 
 # ============================== ruff ==============================

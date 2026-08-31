@@ -98,7 +98,7 @@ will be used if no other method for detecting the version is successful"
 an SCM checkout, so detection succeeds; it just has no tag. Verified locally on a
 one-commit, zero-tag repo:
 
-```
+```text
 NO-TAG VERSION: 0.1.dev1+g8361f6d77
 ```
 
