@@ -122,6 +122,14 @@ conformance = "python scripts/conformance.py"
 # so the local gate and CI cannot drift. Adding a step is one more word on this line.
 check-static = "bash scripts/check.sh lint fmt-check typecheck vale markdownlint conformance"
 check = { depends-on = ["check-static", "test"] }
+# init-repo:begin dogfood
+# TEMPLATE-ONLY. `scripts/init_repo.py` deletes everything between these two markers, and the
+# matching block at the end of `ci.yml`. It renders this template for all three shapes into
+# scratch repos and runs each result's own gate, so a change to the tree cannot quietly break
+# repo creation. It is NOT a step of `check`: it installs three pixi environments and takes
+# minutes, and the gate has to stay something you run before every commit.
+dogfood = "python scripts/dogfood.py"
+# init-repo:end dogfood
 
 # ============================== ruff ==============================
 
