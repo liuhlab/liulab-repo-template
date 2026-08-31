@@ -21,6 +21,7 @@ wrong. Distribution name **`liulab-newpkg`**, import name **`newpkg`**.
 src/newpkg/       the package — rename this directory first
 tests/            pytest, mirroring src/
 docs/             the published site; docs/adr/ and docs/agents/ are agent-facing
+skills/           repo-local agent skills; `python skills/install.py --help`
 scripts/check.sh  the gate runner
 CONTEXT.md        the glossary — the words this repo uses
 ```
