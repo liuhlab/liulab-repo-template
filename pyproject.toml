@@ -68,12 +68,12 @@ pytest = "*"
 # declared empty here so the environment exists and solves.
 [tool.pixi.feature.docs.dependencies]
 
-# `default` is the whole developer environment: it takes every feature, so one `pixi shell`
-# — and one editor language server — sees everything the tree imports. `test` and `docs`
-# are the lean ones a CI job installs. All three share a solve group, so a version cannot
-# differ between the suite, the site and the editor.
+# `default` takes `test` so pyright can resolve pytest when it type-checks `tests/`, and
+# deliberately does NOT take `docs`: the docs environment is the heaviest one and exists so
+# that exactly one CI job installs it. All three share a solve group, so a version cannot
+# differ between the suite, the site and the editor. Write docs from `pixi shell -e docs`.
 [tool.pixi.environments]
-default = { features = ["test", "docs"], solve-group = "default" }
+default = { features = ["test"], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
 docs = { features = ["docs"], solve-group = "default" }
 
