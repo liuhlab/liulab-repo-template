@@ -1,5 +1,10 @@
 .pixi/
+# Build output: `site/` is the docs, `dist/` the wheel. `.cache/` is mkdocs' download cache,
+# which mkdocstrings fills with fetched inventories. mkdocs writes a `.gitignore` holding `*`
+# inside it, so it already hides itself — named here anyway, because a rule this repo relies
+# on should not live in a file a dependency happens to generate.
 site/
+.cache/
 dist/
 build/
 __pycache__/
