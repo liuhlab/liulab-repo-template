@@ -90,7 +90,9 @@ typecheck = "pyright"
 test = "pytest"
 build = "python -m build"
 # `.`, never an absolute path: an absolute path matches no `.vale.ini` section and exits 0.
-vale = "vale ."
+# The globs stop vale walking trees it never lints — check.sh runs steps concurrently, and a
+# walk of .pixi/ races pytest writing __pycache__ there.
+vale = "vale --glob='!{.pixi,site,dist,build}/**' ."
 markdownlint = "markdownlint-cli2"
 conformance = "python scripts/conformance.py"
 # The static step list lives here and nowhere else; `check.sh` takes it as arguments.
