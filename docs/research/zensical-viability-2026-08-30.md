@@ -1,3 +1,8 @@
+---
+search:
+  exclude: true
+---
+
 # Zensical vs mkdocs-material for the lab template
 
 Researched 2026-08-30 against zensical 0.0.57. All claims below marked **[tested]** were
@@ -113,7 +118,7 @@ downloads work. **[tested]**
 What is lost:
 
 | Item | Status | Source |
-|---|---|---|
+| --- | --- | --- |
 | Backlinks | Not supported | [docs](https://zensical.org/docs/setup/extensions/mkdocstrings/) |
 | Watching `paths` outside project root | Not watched; no rebuild on edit | [docs](https://zensical.org/docs/setup/extensions/mkdocstrings/) |
 | `gen-files` / `literate-nav` | Backlog, unimplemented (Tier 2 / Tier 1) | [compatibility/plugins](https://zensical.org/compatibility/plugins/) |
@@ -128,7 +133,7 @@ Flag is `zensical build --strict` (`-s`), or `strict: true` in `mkdocs.yml` sinc
 [setup/validation](https://zensical.org/docs/setup/validation/)).
 
 | Failure mode | Strict result |
-|---|---|
+| --- | --- |
 | Dead internal link | Warns, exits 1 **[tested]** |
 | Dead anchor (`page.md#nope`) | Warns (`invalid_link_anchors`, on by default) — [docs](https://zensical.org/docs/setup/validation/) |
 | Unresolvable mkdocstrings/autoref | Warns "unresolved autoref", exits 1 **[tested]** |
@@ -147,7 +152,7 @@ extension behaviour is identical by construction
 ([pyproject requires_dist](https://pypi.org/pypi/zensical/json)).
 
 | Feature | Result |
-|---|---|
+| --- | --- |
 | admonition, attr_list, md_in_html | OK |
 | pymdownx.details, .highlight, .inlinehilite | OK |
 | pymdownx.snippets (`base_path`, `check_paths`) | OK; missing file fails build |
@@ -170,7 +175,7 @@ module/hook system ([compatibility/features](https://zensical.org/compatibility/
 Last 8 releases ([PyPI JSON API](https://pypi.org/pypi/zensical/json)):
 
 | Version | Date | Version | Date |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 0.0.50 | 2026-07-09 | 0.0.54 | 2026-08-13 |
 | 0.0.51 | 2026-07-17 | 0.0.55 | 2026-08-16 |
 | 0.0.52 | 2026-07-30 | 0.0.56 | 2026-08-18 |
@@ -265,3 +270,11 @@ Block-level `data-search-exclude` via `attr_list` also works
 Two residues: an excluded page still appears in `sitemap.xml` **[tested]**, so search
 engines will index it; and front matter does not remove it from an auto-generated navbar —
 only an explicit `nav:` does.
+
+**Correction, 2026-08-31 (from #23, implementing this note).** The sitemap residue is
+conditional on the navbar being auto-generated. With an explicit `nav:` present, zensical
+builds `sitemap.xml` from the nav, not from the file tree: a template build with two nav
+entries and seven unlisted pages produced a two-entry sitemap **[tested]**. The other claims
+here held exactly as written, including that a page with neither a nav entry nor front
+matter is published *and* indexed. The conda-forge package does ship the `zensical` console
+script, which closes the gap this note left open.

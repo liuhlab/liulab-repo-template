@@ -1,0 +1,223 @@
+# ============================== project ==============================
+
+[project]
+name = "liulab-newpkg"
+description = "One line: what this repo is for. `init-repo` rewrites this."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.13"
+authors = [{ name = "Liu Lab" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+# hatch-vcs reads the newest git tag. Never add a `version` key here.
+dynamic = ["version"]
+dependencies = []
+
+[project.scripts]
+newpkg = "newpkg.cli:main"
+
+# ============================== build ==============================
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+# No `fallback-version`: it is a hand-written version string, which is the thing this
+# repo does not do. With no tag yet, setuptools-scm reports `0.1.devN+g<sha>`, and
+# `init-repo` pushes `v0.0.0` so a new repo does not read as if a release happened.
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/newpkg"]
+
+# ============================== pixi ==============================
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64"]
+
+[tool.pixi.pypi-dependencies]
+liulab-newpkg = { path = ".", editable = true }
+
+# Python is pinned HERE and nowhere else — there is no `py313` feature — so every
+# environment inherits one interpreter and nothing can claim a version it does not run.
+# `requires-python` above is the only other place a version appears.
+#
+# The static gate's tools go in this table too. Every environment inherits them; that is
+# the price of the single pin, and it is cheap because all three share a solve group.
+[tool.pixi.dependencies]
+python = "3.13.*"
+ruff = "*"
+# Pinned exactly: Pylance is pyright, so the editor and CI must give one verdict. Bumping
+# it is a deliberate, reviewed diff.
+pyright = "==1.1.411"
+python-build = "*"
+# Pinned to the version the jargon map and the grade-11 readability number were measured
+# against (`docs/research/vale-setup-2026-08-30.md`). A minor bump can change the metric
+# semantics, which would move the gate without anyone editing a rule.
+vale = "3.19.0.*"
+markdownlint-cli2 = "*"
+# `scripts/conformance.py` reads `mkdocs.yml` and the front matter of every agent-facing page,
+# so the DEFAULT environment needs a YAML parser. It goes here rather than on a feature because
+# conformance is a step of `check-static`, which runs in `default`.
+pyyaml = "*"
+
+[tool.pixi.feature.test.dependencies]
+pytest = "*"
+
+# zensical is pinned EXACTLY, not to a range. At 0.0.x nothing promises that 0.0.58 is
+# compatible, and 0.0.48 shipped a regression that broke search and was hotfixed hours
+# later. Bump it deliberately and re-run `docs-build`.
+[tool.pixi.feature.docs.dependencies]
+zensical = "==0.0.57"
+mkdocstrings-python = ">=2.0.7,<3"
+
+# These live on the `docs` feature, not in [tool.pixi.tasks], so they run in the `docs`
+# environment — the one place zensical is installed. `pixi run docs-build` finds them
+# there without an `-e` flag. The docs build is NOT a step of `check`: this environment is
+# the heaviest one, and it gets its own CI job for that reason.
+#
+# `serve` takes `--strict` but prints "Strict mode is currently unsupported" and ignores
+# it, so it is omitted. `--clean` matches the workflow zensical's own docs publish with.
+[tool.pixi.feature.docs.tasks]
+docs = "zensical serve"
+docs-build = "zensical build --clean --strict"
+
+# `default` takes `test` so pyright can resolve pytest when it type-checks `tests/`, and
+# deliberately does NOT take `docs`: the docs environment is the heaviest one and exists so
+# that exactly one CI job installs it. All three share a solve group, so a version cannot
+# differ between the suite, the site and the editor. Write docs from `pixi shell -e docs`.
+[tool.pixi.environments]
+default = { features = ["test"], solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
+docs = { features = ["docs"], solve-group = "default" }
+
+# One task per gate step. `check` and `check-static` land with `scripts/check.sh`, which
+# runs the static steps concurrently and reports every failure rather than the first.
+[tool.pixi.tasks]
+lint = "ruff check ."
+fmt = "ruff format ."
+fmt-check = "ruff format --check ."
+typecheck = "pyright"
+test = "pytest"
+build = "python -m build"
+# `.` and not an absolute path: vale matches its `.vale.ini` globs against the filename
+# exactly as passed, so an absolute path matches no section, raises no alert and exits 0 —
+# a gate that is silently switched off. pixi runs tasks from the workspace root, so `.`
+# expands to repo-relative names and every section applies.
+vale = "vale ."
+markdownlint = "markdownlint-cli2"
+# The rules every Liu Lab repo keeps after it leaves the template. It reads
+# [tool.liulab.agent-docs] and [tool.liulab.waived] below.
+conformance = "python scripts/conformance.py"
+# The static step list exists HERE and nowhere else — `check.sh` takes it as arguments —
+# so the local gate and CI cannot drift. Adding a step is one more word on this line.
+check-static = "bash scripts/check.sh lint fmt-check typecheck vale markdownlint conformance"
+check = { depends-on = ["check-static", "test"] }
+# init-repo:begin dogfood
+# TEMPLATE-ONLY. `scripts/init_repo.py` deletes everything between these two markers, and the
+# matching block at the end of `ci.yml`. It renders this template for all three shapes into
+# scratch repos and runs each result's own gate, so a change to the tree cannot quietly break
+# repo creation. It is NOT a step of `check`: it installs three pixi environments and takes
+# minutes, and the gate has to stay something you run before every commit.
+dogfood = "python scripts/dogfood.py"
+# init-repo:end dogfood
+
+# ============================== ruff ==============================
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "scripts"]
+# No `target-version`. Ruff infers it from `requires-python`, so the linted version and
+# the installed version cannot disagree.
+extend-exclude = [".pixi", "site", "build", "dist"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "PT",  # flake8-pytest-style
+    "PTH", # flake8-use-pathlib
+    "N",   # pep8-naming
+    "D",   # pydocstyle (numpy convention, configured below)
+    "RUF", # ruff-specific
+]
+# E501: the formatter owns line length. D203/D213: incompatible with D211/D212.
+ignore = ["E501", "D203", "D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+
+# ============================== pyright ==============================
+
+[tool.pyright]
+# `scripts` and `skills` are in scope, not just the package. They were left out at first, which
+# made `skills/install.py` and `scripts/conformance.py` — the two files that CI and a conformance
+# rule EXECUTE — the only tracked Python nothing type-checked. Every one of these files is clean
+# at `standard` today, so the wider scope costs nothing and keeps the gate honest.
+include = ["src", "tests", "scripts", "skills"]
+exclude = ["**/__pycache__", "**/.pixi"]
+venvPath = ".pixi/envs"
+venv = "default"
+# No `pythonVersion`: pyright takes it from the interpreter in the environment above.
+typeCheckingMode = "standard"
+useLibraryCodeForTypes = true
+reportMissingTypeStubs = "none"
+
+# ============================== pytest ==============================
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = ["error"]
+
+# ============================== liulab ==============================
+# Read by `scripts/conformance.py`. See its docstring for what each rule requires.
+
+# THE declared agent-facing set — one list, every consumer reads it. Two lists that must match
+# drifted once already and turned CI red on every open pull request.
+#
+# Keys are plain PATH PREFIXES matched against `git ls-files`, deliberately not globs:
+# reimplementing Vale's glob matcher would reproduce two known surprises, so `.vale.ini` is not
+# the source of truth either. A key ending in `/` matches everything under that directory; any
+# other key matches that path exactly.
+#
+# Values name the Vale Length rule that applies to those files, or `false` where none does.
+# Conformance rule 3 pairs each key with the `.vale.ini` section whose header spells it and
+# asserts the section turns that rule ON and every other Length rule OFF — asserting mere
+# presence would pass the exact config that once left ADRs checked by nothing.
+[tool.liulab.agent-docs]
+"AGENTS.md" = "LengthDoc"
+"CONTEXT.md" = "LengthDoc"
+"docs/agents/" = "LengthDoc"
+"skills/" = "LengthDoc"
+"docs/adr/" = "LengthAdr"
+"docs/research/" = false
+
+# Waivers. Keyed by RULE NAME, value the reason — per-rule, never per-file, because per-file
+# waivers grow into the second config this design just deleted. There is no expiry: every waiver
+# is printed on every run, green runs included, because an escape hatch that stops being visible
+# becomes permanent. `placeholder-rename` refuses to be waived; naming it here is itself a
+# failure. Length caps need no waiver, because the caps are dials in `styles/Lab/`.
+#
+#     [tool.liulab.waived]
+#     repo-shape = "docs-only repo; the notebooks under src/ are examples, not a package"
+[tool.liulab.waived]

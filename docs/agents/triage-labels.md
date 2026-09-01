@@ -1,3 +1,8 @@
+---
+search:
+  exclude: true
+---
+
 # Triage labels
 
 Each label string equals its role name — the mapping is the identity, so there is no

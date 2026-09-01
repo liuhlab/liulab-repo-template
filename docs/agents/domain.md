@@ -1,3 +1,8 @@
+---
+search:
+  exclude: true
+---
+
 # Domain docs
 
 **Single-context**: one `CONTEXT.md` and one `docs/adr/` at the repo root.
@@ -17,4 +22,4 @@ If your output contradicts an ADR, say so rather than silently overriding it.
 notes. An ADR is written only when a decision is hard to reverse, surprising without
 context, and the result of a real trade-off. All three, or no record.
 
-Both are agent-facing and capped — see the writing rules in `AGENTS.md`.
+Both are agent-facing and capped — see `docs/agents/writing.md`.
