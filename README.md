@@ -56,7 +56,7 @@ pixi run docs-build
 ## Set up your agent
 
 The skills in `skills/` are already linked for Claude Code and for the shared `.agents/`
-path. Link them for another agent too:
+path. Other agent tools need one command:
 
 ```bash
 python skills/install.py --target all
@@ -71,7 +71,8 @@ Add it once per machine:
 ```
 
 Those two lines set up your machine, not this repo. The repo is public, and the plugin is
-about how you work rather than what the repo is. So no file here names it, and none should.
+about how you work rather than what the repo is. So no settings file here declares it, and
+none should.
 
 ## What is in it
 
