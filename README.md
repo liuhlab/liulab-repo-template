@@ -7,6 +7,11 @@ small Python package, one command that runs every check, a docs site, and skills
 agents. It passes its own rules on every pull request. That is the point: the template is
 evidence rather than a promise.
 
+**See what it produces:** [liulab-repo-demo](https://github.com/liuhlab/liulab-repo-demo) was
+made from this template and left exactly as `init-repo` finished it. Its
+[site](https://liuhlab.github.io/liulab-repo-demo/) and its green checks are the same ones you
+get. Read it beside this repo to see what changes and what stays.
+
 ## Make a repo from it
 
 1. Press **Use this template** near the top of this page, then **Create a new repository**.
