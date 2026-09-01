@@ -110,5 +110,5 @@ Repeat the script's `next` list, and be clear about the two things it cannot do:
   not publish.
 
 Say what the script deliberately left behind, so nobody mistakes it for this repo's own:
-`CHANGELOG.md` still holds the template's entries, and the placeholder `greet()` and its
-test are still in the package until real code replaces them.
+the placeholder `greet()` and its test stay in the package until real code replaces them.
+`CHANGELOG.md` is emptied down to its heading, so the first entry under it is theirs.

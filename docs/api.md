@@ -9,4 +9,7 @@ Write the docstring; this page follows.
 
 ## The command line
 
-::: newpkg.cli.main
+The whole module, because typer makes every verb a plain function with a docstring, and
+`newpkg.cli:app` — the object `[project.scripts]` registers — is built from them.
+
+::: newpkg.cli

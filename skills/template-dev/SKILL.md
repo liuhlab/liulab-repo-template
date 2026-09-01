@@ -44,13 +44,30 @@ forever.
 
 `init-repo` **subtracts**. It deletes this skill, the `init-repo` skill, their symlinks,
 and the CI job that renders the template. A repo that does not publish loses the release
-workflow; a repo with no package also loses `src/` and `tests/`. `CHANGELOG.md` is never
-subtracted.
+workflow; a repo with no package also loses `src/` and `tests/`. The `CHANGELOG.md` file
+is never subtracted.
 
 Before adding anything, decide which side of that line it is on. Template-only machinery
 must be **deletable by path**, and no file a derived repo keeps may name it — a pointer in
 a surviving file turns into a dangling reference in fifty repos. Generic files must not
 mention this skill, the dogfood job, or anything else that will not be there.
+
+## The records stay here
+
+This repo's ADR and its research notes are the same category as this skill: they say how
+the **template** was built, and none of it is a decision the new repo made. `init-repo`
+deletes all four, and cuts every citation of them out of the files a derived repo keeps —
+`mkdocs.yml`, `docs.yml`, `pyproject.toml` and two rules in `styles/Lab/`.
+
+So write a record here freely, and when you cite one, expect to add the cut with it.
+Deletion is **by exact path**, never by directory: a repo initialized late may have
+written `docs/adr/0002-*.md` already, and `docs/adr/` is allowed to disappear when its
+last file does. No `.gitkeep` — `/domain-modeling` makes the directory when it needs one.
+
+`CHANGELOG.md` is the exception that proves the shape. The file always ships, because a
+repo that publishes needs one, but its entries are this template's history, so they are
+emptied out — guarded by the untouched check, so a late init never cuts real entries. Add
+an entry here for anything worth knowing about; it does not travel.
 
 ## Changing a shared convention
 

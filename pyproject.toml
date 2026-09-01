@@ -18,10 +18,13 @@ classifiers = [
 ]
 # hatch-vcs reads the newest git tag. Never add a `version` key here.
 dynamic = ["version"]
-dependencies = []
+# The command line's framework, and the only runtime dependency the placeholder has. A wheel
+# that registers a command without declaring what the command imports is broken, so this key
+# and `[project.scripts]` below are one decision: `init-repo --no-cli` removes both.
+dependencies = ["typer>=0.12"]
 
 [project.scripts]
-newpkg = "newpkg.cli:main"
+newpkg = "newpkg.cli:app"
 
 # ============================== build ==============================
 
@@ -55,6 +58,11 @@ liulab-newpkg = { path = ".", editable = true }
 # the price of the single pin, and it is cheap because all three share a solve group.
 [tool.pixi.dependencies]
 python = "3.13.*"
+# The one runtime dependency, mirrored from `[project] dependencies` so pixi takes it from
+# conda-forge instead of resolving it from PyPI. Both spellings are one decision and
+# `init-repo --no-cli` removes both: a repo that declined a command line must not install
+# the library only its command line imported.
+typer = ">=0.12"
 ruff = "*"
 # Pinned exactly: Pylance is pyright, so the editor and CI must give one verdict. Bumping
 # it is a deliberate, reviewed diff.
