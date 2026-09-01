@@ -89,6 +89,16 @@ MARKED_BLOCKS = ((".github/workflows/ci.yml", "dogfood"), ("pyproject.toml", "do
 #: The task lines a repo with no package has no use for, matched whole.
 TASKS_A_PACKAGE_NEEDS = frozenset({'test = "pytest"', 'build = "python -m build"'})
 
+#: The command line's framework, and the three lines `pyproject.toml` declares it on: the wheel's
+#: own requirement, the comment introducing the conda mirror, and the mirror itself. A repo that
+#: declined a command line must not install the library only its command line imported, so all
+#: three go — and `drop_lock_dependency` takes the package out of `pixi.lock` with them.
+CLI_DEPENDENCY = "typer"
+CLI_PROJECT_COMMENT = "# The command line's framework, and the only"
+CLI_PROJECT_DEPENDENCY = f'dependencies = ["{CLI_DEPENDENCY}>=0.12"]'
+CLI_PIXI_COMMENT = "# The one runtime dependency, mirrored from"
+CLI_PIXI_DEPENDENCY = f'{CLI_DEPENDENCY} = ">=0.12"'
+
 #: Committing needs an identity, and a fresh runner has none configured.
 GIT_IDENTITY = ("-c", "user.name=init-repo", "-c", "user.email=init-repo@localhost")
 
@@ -328,6 +338,165 @@ def drop_lock_self_reference(text: str) -> str | None:
         kept.append(line)
         index += 1
     return "".join(kept) if changed else None
+
+
+def drop_cli_dependency(text: str) -> str | None:
+    """Remove the command line's framework from both of `pyproject.toml`'s dependency tables.
+
+    Declared twice on purpose — the wheel's own requirement, and the conda mirror pixi installs
+    from — so it has to be taken out twice. `[project] dependencies` is emptied rather than
+    deleted: the key is where the first real dependency goes, and a wheel with no dependencies
+    says so explicitly. Each declaration's comment goes with it — a note explaining a dependency
+    that is not there any more is the same residue as the dependency.
+    """
+    anchors: tuple[Callable[[str], str | None], ...] = (
+        lambda t: drop_comment_block(t, CLI_PROJECT_COMMENT),
+        lambda t: _replace(t, CLI_PROJECT_DEPENDENCY, "dependencies = []"),
+        lambda t: drop_comment_block(t, CLI_PIXI_COMMENT),
+        lambda t: drop_lines(t, lambda line: line.rstrip() == CLI_PIXI_DEPENDENCY),
+    )
+    edited = text
+    for anchor in anchors:
+        found = anchor(edited)
+        if found is None:
+            return None
+        edited = found
+    return edited
+
+
+def _lock_package_name(url: str) -> str:
+    """Read a conda package's name off its URL: the file name, less the version and the build."""
+    return url.rsplit("/", 1)[-1].rsplit("-", 2)[0]
+
+
+def _lock_pool(lines: list[str]) -> dict[str, tuple[str, set[str]]]:
+    """Map every conda package in the lock's pool to its name and the names it depends on.
+
+    The pool is the flat list at the end of the file — one entry per package, starting at column
+    zero, with its `depends:` block indented under it.
+    """
+    pool: dict[str, tuple[str, set[str]]] = {}
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        index += 1
+        if not line.startswith("- conda: "):
+            continue
+        url = line.removeprefix("- conda: ").strip()
+        depends: set[str] = set()
+        listing = False
+        while index < len(lines) and lines[index].startswith(" "):
+            entry = lines[index].rstrip()
+            index += 1
+            if entry == "  depends:":
+                listing = True
+            elif not entry.startswith("  - "):
+                listing = False
+            elif listing:
+                depends.add(entry.removeprefix("  - ").split()[0])
+        pool[url] = (_lock_package_name(url), depends)
+    return pool
+
+
+def _dropped_references(
+    lines: list[str], span: range, pool: dict[str, tuple[str, set[str]]], name: str
+) -> set[int]:
+    """Pick the lines of one environment's package list that go when `name` does.
+
+    `name` itself, then anything it reaches that nothing else in this environment still needs —
+    repeatedly, because a dependency of a dependency is an orphan too.
+    """
+    at: dict[str, int] = {}
+    needs: dict[str, set[str]] = {}
+    for index in span:
+        entry = pool.get(lines[index].strip().removeprefix("- conda: "))
+        if entry is None:
+            return set()
+        at[entry[0]], needs[entry[0]] = index, entry[1]
+    if name not in at:
+        return set()
+    reachable: set[str] = set()
+    stack = [name]
+    while stack:
+        for dependency in needs[stack.pop()]:
+            if dependency in needs and dependency not in reachable:
+                reachable.add(dependency)
+                stack.append(dependency)
+    doomed = {name}
+    while True:
+        orphans = {
+            package
+            for package in reachable - doomed
+            if not any(package in needs[other] for other in needs.keys() - doomed)
+        }
+        if not orphans:
+            return {at[package] for package in doomed}
+        doomed |= orphans
+
+
+def _is_lock_reference(line: str) -> bool:
+    """Whether this line lists a conda package in an environment, rather than defining one."""
+    return line.startswith(" ") and line.lstrip().startswith("- conda: ")
+
+
+def _drop_requirement(lines: list[str], name: str) -> list[str]:
+    """Remove one requirement from every `requires_dist` in the lock, and a key it empties."""
+    kept: list[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        index += 1
+        if line.rstrip() != "  requires_dist:":
+            kept.append(line)
+            continue
+        requirements = []
+        while index < len(lines) and lines[index].startswith("  - "):
+            if re.match(rf"  - {re.escape(name)}(?![\w.-])", lines[index]) is None:
+                requirements.append(lines[index])
+            index += 1
+        if requirements:
+            kept += [line, *requirements]
+    return kept
+
+
+def drop_lock_dependency(text: str, name: str) -> str | None:
+    """Remove one conda package from `pixi.lock`, along with whatever came in only for it.
+
+    A dependency taken out of `pyproject.toml` has to come out of here too: `pixi install
+    --locked` refuses a lock holding packages the manifest no longer asks for, and re-solving is
+    not an option — it needs the network, and a rendered repo installs from the lock it
+    inherited. What came in with the package is FOUND rather than listed, the way
+    `drop_unused_imports` asks whether a name is still used: everything the package reaches that
+    nothing else in that environment still needs goes with it, so a version bump that changes
+    its dependencies cannot leave this stale.
+    """
+    lines = _lines(text)
+    pool = _lock_pool(lines)
+    doomed: set[int] = set()
+    start: int | None = None
+    for index in range(len(lines) + 1):
+        if index < len(lines) and _is_lock_reference(lines[index]):
+            start = index if start is None else start
+        elif start is not None:
+            doomed |= _dropped_references(lines, range(start, index), pool, name)
+            start = None
+    kept = [line for index, line in enumerate(lines) if index not in doomed]
+
+    # The pool is shared by every environment, so an entry goes only once nothing lists it.
+    listed = {line.strip().removeprefix("- conda: ") for line in kept if _is_lock_reference(line)}
+    pruned: list[str] = []
+    index = 0
+    while index < len(kept):
+        line = kept[index]
+        index += 1
+        if line.startswith("- conda: ") and line.removeprefix("- conda: ").strip() not in listed:
+            while index < len(kept) and kept[index].startswith(" "):
+                index += 1
+            continue
+        pruned.append(line)
+
+    edited = "".join(_drop_requirement(pruned, name))
+    return edited if edited != text else None
 
 
 def _replace(text: str, old: str, new: str) -> str | None:
@@ -580,6 +749,24 @@ class Init:
             lambda text: drop_paragraph(text, "This is the Liu Lab repo template"),
         )
 
+    def prune_cli_dependency(self) -> None:
+        """Take the command line's framework out of the manifest and the lock, together.
+
+        Both shapes that ship no command line come through here — the one that declined it and
+        the one that has no package at all — because a repo carrying the library only its
+        command line imported is exactly the residue this template exists to prevent.
+        """
+        self.edit(
+            "pyproject.toml",
+            f"{CLI_DEPENDENCY}, in both dependency tables",
+            drop_cli_dependency,
+        )
+        self.edit(
+            "pixi.lock",
+            f"{CLI_DEPENDENCY} and the packages that came with it",
+            lambda text: drop_lock_dependency(text, CLI_DEPENDENCY),
+        )
+
     def prune_cli(self) -> None:
         """Take the command line out of a package that does not want one."""
         self.remove(f"src/{PLACEHOLDER_MODULE}/cli.py")
@@ -588,6 +775,7 @@ class Init:
             "[project.scripts]",
             lambda text: drop_toml_table(text, "[project.scripts]"),
         )
+        self.prune_cli_dependency()
         self.edit(
             "docs/api.md",
             "the command line reference",
@@ -651,6 +839,7 @@ class Init:
                 'include = ["scripts", "skills"]',
             ),
         )
+        self.prune_cli_dependency()
         self.edit("pixi.lock", "the editable install of this repo", drop_lock_self_reference)
         for job in ("test", "build"):
             self.edit(

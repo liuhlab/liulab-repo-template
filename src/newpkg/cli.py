@@ -1,31 +1,29 @@
-"""The command line. One verb, so `[project.scripts]` has something to register."""
+"""The command line. One verb and a version, so `[project.scripts]` has something to register.
 
-import argparse
-from collections.abc import Sequence
+Typer, because every lab repo that ships a command line uses it: one `typer.Typer` named
+`app`, `no_args_is_help=True` so a bare invocation prints help instead of nothing, and a
+`version` command. A larger surface grows by mounting sub-apps with `app.add_typer`.
+"""
 
-from newpkg import __version__
-from newpkg.core import greet
+from typing import Annotated
+
+import typer
+
+from newpkg import __version__ as _package_version
+from newpkg.core import greet as _greet
+
+#: What `[project.scripts]` registers. Typer builds the parser from the signatures below, so
+#: a verb is a function and its help is the docstring.
+app = typer.Typer(help="The placeholder command.", no_args_is_help=True)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Run the command line.
+@app.command()
+def version() -> None:
+    """Print the installed package version."""
+    typer.echo(_package_version)
 
-    Parameters
-    ----------
-    argv
-        Arguments to parse. `None` reads `sys.argv`.
 
-    Returns
-    -------
-    int
-        The process exit code.
-    """
-    parser = argparse.ArgumentParser(prog="newpkg", description="The placeholder command.")
-    parser.add_argument("--version", action="version", version=__version__)
-    verbs = parser.add_subparsers(dest="verb", required=True)
-    hello = verbs.add_parser("greet", help="Print a greeting.")
-    hello.add_argument("name", nargs="?", default="world", help="Who to greet.")
-
-    args = parser.parse_args(argv)
-    print(greet(args.name))
-    return 0
+@app.command()
+def greet(name: Annotated[str, typer.Argument(help="Who to greet.")] = "world") -> None:
+    """Print a greeting addressed to NAME."""
+    typer.echo(_greet(name))
