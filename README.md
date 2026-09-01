@@ -12,6 +12,9 @@ made from this template and left exactly as `init-repo` finished it. Its
 [site](https://liuhlab.github.io/liulab-repo-demo/) and its green checks are the same ones you
 get. Read it beside this repo to see what changes and what stays.
 
+The site has the longer version:
+[what the template ships, and what `init-repo` subtracts](https://liuhlab.github.io/liulab-repo-template/template/).
+
 ## Make a repo from it
 
 1. Press **Use this template** near the top of this page, then **Create a new repository**.

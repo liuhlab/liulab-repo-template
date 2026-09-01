@@ -64,6 +64,12 @@ Deletion is **by exact path**, never by directory: a repo initialized late may h
 written `docs/adr/0002-*.md` already, and `docs/adr/` is allowed to disappear when its
 last file does. No `.gitkeep` — `/domain-modeling` makes the directory when it needs one.
 
+The site is two configs. `mkdocs.yml` ships the placeholder identity, as above;
+`mkdocs.template.yml` inherits it, overrides the identity, and adds `docs/template/index.md`
+— the page about the template — to the nav. Both files go at init, with the `-f` flag on the
+two docs tasks and the marked block on `docs/index.md`. Prose about the template belongs on
+that page, never on one a derived repo keeps.
+
 `CHANGELOG.md` is the exception that proves the shape. The file always ships, because a
 repo that publishes needs one, but its entries are this template's history, so they are
 emptied out — guarded by the untouched check, so a late init never cuts real entries. Add

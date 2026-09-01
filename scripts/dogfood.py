@@ -55,15 +55,19 @@ PLACEHOLDER = "new" + "pkg"
 #: them, each edited by a different anchor in `scripts/init_repo.py`.
 CLI_DEPENDENCY = "typer"
 
-#: The template's own records — how it chose its docs site, and the evidence behind the rules it
-#: ships. Spelled out here rather than imported from `scripts/init_repo.py`, for the reason the
-#: two constants above are: an assertion that reads its expectation out of the thing it is
-#: checking cannot tell a deletion that ran from a list that quietly lost an entry.
-TEMPLATE_RECORDS = (
+#: What this repo says about ITSELF: its own records — how it chose its docs site, and the
+#: evidence behind the rules it ships — and the two files that publish it as the template, the
+#: page describing it and the config that names the site after it. Spelled out here rather than
+#: imported from `scripts/init_repo.py`, for the reason the two constants above are: an assertion
+#: that reads its expectation out of the thing it is checking cannot tell a deletion that ran
+#: from a list that quietly lost an entry.
+TEMPLATE_ARTIFACTS = (
     "docs/adr/0001-docs-site-on-zensical.md",
     "docs/research/github-template-mechanics-2026-08-30.md",
     "docs/research/vale-setup-2026-08-30.md",
     "docs/research/zensical-viability-2026-08-30.md",
+    "docs/template/index.md",
+    "mkdocs.template.yml",
 )
 
 #: The `PIXI_*` variables a parent `pixi run` exports. They name the TEMPLATE's manifest, and a
@@ -202,19 +206,20 @@ def check_declined_cli(rung: Rung, stage: Path) -> list[str]:
     ]
 
 
-def check_template_records(stage: Path) -> list[str]:
-    """Grep a rendered repo for the template's own records, as a path and as a citation.
+def check_template_artifacts(stage: Path) -> list[str]:
+    """Grep a rendered repo for what the template says about itself, as a path and a citation.
 
-    None of the four is about the repo that inherited it, and the rendered repo's own gate is
-    happy either way — a stale ADR passes every rule the template propagates. Citations are
-    checked with the paths because a comment pointing at a document that is not there is the
-    same residue as the document, spread over more files.
+    None of it is about the repo that inherited it, and the rendered repo's own gate is happy
+    either way — a stale ADR passes every rule the template propagates. Citations are checked
+    with the paths because a comment pointing at a document that is not there is the same residue
+    as the document, spread over more files, and because the citation is the only thing that
+    catches a docs task still built with `-f mkdocs.template.yml`.
     """
     tracked = tracked_paths(stage)
     problems = [
-        f"{record} is the template's own record and is still tracked"
-        for record in TEMPLATE_RECORDS
-        if record in tracked
+        f"{artifact} is the template's own and is still tracked"
+        for artifact in TEMPLATE_ARTIFACTS
+        if artifact in tracked
     ]
     for rel in tracked:
         path = stage / rel
@@ -222,9 +227,9 @@ def check_template_records(stage: Path) -> list[str]:
             continue
         body = path.read_bytes()
         problems += [
-            f"{rel} still points at {record}, which this repo does not have"
-            for record in TEMPLATE_RECORDS
-            if record.encode() in body
+            f"{rel} still points at {artifact}, which this repo does not have"
+            for artifact in TEMPLATE_ARTIFACTS
+            if artifact.encode() in body
         ]
     return problems
 
@@ -304,7 +309,7 @@ def render(rung: Rung, parent: Path) -> None:
         check_placeholder(stage)
         + check_shape(rung, stage)
         + check_declined_cli(rung, stage)
-        + check_template_records(stage)
+        + check_template_artifacts(stage)
         + check_changelog(stage)
     )
     if problems:
