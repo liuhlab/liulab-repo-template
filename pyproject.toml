@@ -71,9 +71,13 @@ mkdocstrings-python = ">=2.0.7,<3"
 
 # On the feature, so these resolve in the `docs` environment with no `-e` flag.
 # `serve` ignores `--strict` and says so, hence its absence.
+#
+# `-f mkdocs.template.yml` is TEMPLATE-ONLY. That file inherits `mkdocs.yml` and overrides the
+# identity keys, so this repo's site is named for itself while the shipped config keeps the
+# placeholder. `init-repo` deletes the file and takes the flag off both lines below.
 [tool.pixi.feature.docs.tasks]
-docs = "zensical serve"
-docs-build = "zensical build --clean --strict"
+docs = "zensical serve -f mkdocs.template.yml"
+docs-build = "zensical build -f mkdocs.template.yml --clean --strict"
 
 # `default` takes `test` so pyright can resolve pytest, and not `docs`, which exists so that
 # exactly one CI job installs it.

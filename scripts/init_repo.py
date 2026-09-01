@@ -23,8 +23,10 @@ Actions come in two kinds, and only one of them is dangerous:
 
 Exempt from that check, deleted unconditionally and tolerated when absent: the two skill
 directories, their four symlinks, the `dogfood` job and its task, `scripts/dogfood.py`, this
-file, and the template's own records — the ADR and the three research notes that say how the
-template was built. Their removal is the entire point, so nothing about them is negotiable.
+file, the two files that publish this repo as the template — `docs/template/index.md` and the
+`mkdocs.template.yml` that names the site after it — and the template's own records, the ADR and
+the three research notes that say how the template was built. Their removal is the entire point,
+so nothing about them is negotiable.
 `CHANGELOG.md` is the one record handled the other way: the file always ships, and emptying it
 of the template's entries is guarded, so a late init never discards what someone wrote.
 
@@ -81,6 +83,10 @@ TEMPLATE_ONLY = (
     ".claude/skills/template-dev",
     ".agents/skills/init-repo",
     ".agents/skills/template-dev",
+    # The template's own site: the page about the template, and the config that names the site
+    # after it. `mkdocs.yml` is the config every repo keeps and is not here.
+    "docs/template/index.md",
+    "mkdocs.template.yml",
     "scripts/dogfood.py",
     "scripts/init_repo.py",
 )
@@ -125,10 +131,15 @@ RECORD_POINTERS = (
 #: format to write in, and keeps this file from holding a second copy of it to drift from.
 CHANGELOG_UNRELEASED = "## [Unreleased]"
 
-#: Files carrying an `init-repo:begin dogfood` / `init-repo:end dogfood` pair. The dogfood job
-#: cannot be deleted by path — it is one job inside a workflow every repo keeps — so it ships as
-#: a delimited trailing block and removing it stays mechanical instead of becoming YAML surgery.
-MARKED_BLOCKS = ((".github/workflows/ci.yml", "dogfood"), ("pyproject.toml", "dogfood"))
+#: Files carrying an `init-repo:begin <name>` / `init-repo:end <name>` pair. Template-only text
+#: inside a file every repo keeps cannot be deleted by path — the dogfood job is one job in a
+#: workflow, the front page's pointer at `docs/template/` is one paragraph of a page — so each
+#: ships delimited, and removing it stays mechanical instead of becoming YAML or prose surgery.
+MARKED_BLOCKS = (
+    (".github/workflows/ci.yml", "dogfood"),
+    ("pyproject.toml", "dogfood"),
+    ("docs/index.md", "template-docs"),
+)
 
 #: The task lines a repo with no package has no use for, matched whole.
 TASKS_A_PACKAGE_NEEDS = frozenset({'test = "pytest"', 'build = "python -m build"'})
@@ -175,20 +186,6 @@ def drop_lines(text: str, accepts: Callable[[str], bool]) -> str | None:
     lines = _lines(text)
     kept = [line for line in lines if not accepts(line)]
     return "".join(kept) if len(kept) != len(lines) else None
-
-
-def drop_paragraph(text: str, prefix: str) -> str | None:
-    """Remove the paragraph starting at the first line with this prefix, and the blank after it."""
-    lines = _lines(text)
-    start = _find(lines, lambda line: line.startswith(prefix))
-    if start is None:
-        return None
-    end = start
-    while end < len(lines) and lines[end].strip():
-        end += 1
-    while end < len(lines) and not lines[end].strip():
-        end += 1
-    return _cut(lines, start, end)
 
 
 def drop_example(text: str, prefix: str) -> str | None:
@@ -799,9 +796,19 @@ class Init:
             lambda text: drop_markdown_section(text, "### Placeholder package"),
         )
         self.edit(
-            "docs/index.md",
-            "the paragraph about the template",
-            lambda text: drop_paragraph(text, "This is the Liu Lab repo template"),
+            "pyproject.toml",
+            "the note about the template's own site config",
+            lambda text: drop_comment_block(text, "# `-f mkdocs.template.yml` is TEMPLATE-ONLY"),
+        )
+        self.edit(
+            "pyproject.toml",
+            "the template's site config, in both docs tasks",
+            lambda text: _replace(
+                text,
+                'docs = "zensical serve -f mkdocs.template.yml"\n'
+                'docs-build = "zensical build -f mkdocs.template.yml --clean --strict"',
+                'docs = "zensical serve"\ndocs-build = "zensical build --clean --strict"',
+            ),
         )
         for rel, old, new in RECORD_POINTERS:
             self.edit(

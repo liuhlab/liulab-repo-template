@@ -1,9 +1,12 @@
 # liulab-newpkg
 
-One line: what this repo is for. `init-repo` rewrites this page.
-
+<!-- init-repo:begin template-docs -->
 This is the Liu Lab repo template with its placeholder package still in place. The package
-is called `liulab-newpkg` and imports as `newpkg`.
+is called `liulab-newpkg` and imports as `newpkg`. What the template ships, and how to make a
+repo from it, is on [The template](template/index.md).
+<!-- init-repo:end template-docs -->
+
+One line: what this repo is for. `init-repo` rewrites this page.
 
 ## Install it
 
