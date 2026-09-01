@@ -22,8 +22,11 @@ Actions come in two kinds, and only one of them is dangerous:
   asked the person.
 
 Exempt from that check, deleted unconditionally and tolerated when absent: the two skill
-directories, their four symlinks, the `dogfood` job and its task, `scripts/dogfood.py`, and
-this file. Their removal is the entire point, so nothing about them is negotiable.
+directories, their four symlinks, the `dogfood` job and its task, `scripts/dogfood.py`, this
+file, and the template's own records — the ADR and the three research notes that say how the
+template was built. Their removal is the entire point, so nothing about them is negotiable.
+`CHANGELOG.md` is the one record handled the other way: the file always ships, and emptying it
+of the template's entries is guarded, so a late init never discards what someone wrote.
 
 Everything else is an ANCHORED edit: it matches text the template ships and reports a miss
 rather than failing. A repo that rewrote the passage keeps what it wrote, and the one thing
@@ -61,7 +64,8 @@ PLACEHOLDER_DIST = f"liulab-{PLACEHOLDER_MODULE}"
 PLACEHOLDER_DESCRIPTION = "One line: what this repo is for. `init-repo` rewrites this."
 
 #: Three rungs on one ladder. `published` subtracts nothing, `not-published` drops the release
-#: workflow, `no-package` also drops `src/` and `tests/`. `CHANGELOG.md` survives all three.
+#: workflow, `no-package` also drops `src/` and `tests/`. The `CHANGELOG.md` FILE survives all
+#: three; its entries do not, which is a different question and `CHANGELOG_UNRELEASED` answers it.
 SHAPES = ("published", "not-published", "no-package")
 
 #: Used when a remote is a local path rather than a GitHub URL, which is what a scratch clone
@@ -80,6 +84,47 @@ TEMPLATE_ONLY = (
     "scripts/dogfood.py",
     "scripts/init_repo.py",
 )
+
+#: The template's own records: the decision it made about its docs site, and the three notes
+#: behind the rules it ships. Same category as the two skills above — machinery whose removal is
+#: the point — so they go the same way, unconditionally and tolerated when absent.
+#:
+#: BY EXACT PATH, never by directory or glob. A repo initialized late may already have written
+#: `docs/adr/0002-*.md` or a research note of its own, and deleting `docs/adr/` would take it
+#: with these. Both directories are allowed to disappear with their last file: `Repo.delete`
+#: prunes what it empties, and `docs/agents/domain.md` says `/domain-modeling` creates
+#: `docs/adr/` when it needs one and that a missing one is not an error. No `.gitkeep` — a
+#: tracked file whose only job is to exist is exactly the residue this script removes.
+TEMPLATE_ADR = "docs/adr/0001-docs-site-on-zensical.md"
+TEMPLATE_VALE_NOTE = "docs/research/vale-setup-2026-08-30.md"
+TEMPLATE_RECORDS = (
+    TEMPLATE_ADR,
+    "docs/research/github-template-mechanics-2026-08-30.md",
+    TEMPLATE_VALE_NOTE,
+    "docs/research/zensical-viability-2026-08-30.md",
+)
+
+#: Every citation of a record above that lives in a file a derived repo KEEPS, and what the
+#: sentence becomes once the citation goes. Deleting a document and leaving five files pointing
+#: at it trades one kind of residue for a worse one, so each citation is cut where it stands
+#: rather than the paragraph explaining the rule around it.
+RECORD_POINTERS = (
+    ("mkdocs.yml", f"# See {TEMPLATE_ADR}.\n", ""),
+    (".github/workflows/docs.yml", f" See `{TEMPLATE_ADR}`.", ""),
+    ("pyproject.toml", f" (`{TEMPLATE_VALE_NOTE}`)", ""),
+    ("styles/Lab/Readability.yml", f" See `{TEMPLATE_VALE_NOTE}`.", ""),
+    (
+        "styles/Lab/Jargon.yml",
+        f"# The measurements and the per-pattern evidence are in\n# `{TEMPLATE_VALE_NOTE}`. Do not",
+        "# Do not",
+    ),
+)
+
+#: The heading the changelog is reset to. Everything below it is the TEMPLATE's history — one
+#: entry even describes the release workflow the lower two rungs delete — and none of it is the
+#: new repo's. Truncating at the heading keeps the preamble, which is the part that says what
+#: format to write in, and keeps this file from holding a second copy of it to drift from.
+CHANGELOG_UNRELEASED = "## [Unreleased]"
 
 #: Files carrying an `init-repo:begin dogfood` / `init-repo:end dogfood` pair. The dogfood job
 #: cannot be deleted by path — it is one job inside a workflow every repo keeps — so it ships as
@@ -186,6 +231,15 @@ def drop_comment_block(text: str, prefix: str) -> str | None:
     while end < len(lines) and lines[end].lstrip().startswith("#"):
         end += 1
     return _cut(lines, start, end)
+
+
+def truncate_at(text: str, heading: str) -> str | None:
+    """Keep everything down to and including this heading, and drop what is under it."""
+    lines = _lines(text)
+    start = _find(lines, lambda line: line.rstrip() == heading)
+    if start is None:
+        return None
+    return "".join(lines[: start + 1])
 
 
 def drop_marked_block(text: str, name: str) -> str | None:
@@ -687,7 +741,13 @@ class Init:
 
     def survey(self) -> None:
         """Decide, before anything changes, which deletions and overwrites may run."""
-        targets = [Guarded("README.md", "rewrite", "it describes the template, not this repo")]
+        targets = [
+            Guarded("README.md", "rewrite", "it describes the template, not this repo"),
+            # The FILE is never subtracted — rule 8 wants one wherever `release.yml` is — but its
+            # entries are the template's history. Guarded, and only here: a repo initialized
+            # eight months late has real entries under that heading, and they are not ours to cut.
+            Guarded("CHANGELOG.md", "reset", "its entries are the template's, not this repo's"),
+        ]
         if self.identity.shape != "published":
             targets.append(
                 Guarded(".github/workflows/release.yml", "delete", "this repo does not publish")
@@ -726,7 +786,7 @@ class Init:
 
     def remove_template_only(self) -> None:
         """Delete the artifacts whose removal is the point, wherever they still are."""
-        for rel in TEMPLATE_ONLY:
+        for rel in (*TEMPLATE_ONLY, *TEMPLATE_RECORDS):
             self.remove(rel)
         for rel, name in MARKED_BLOCKS:
             self.edit(rel, f"the {name} block", lambda text, n=name: drop_marked_block(text, n))
@@ -748,6 +808,12 @@ class Init:
             "the paragraph about the template",
             lambda text: drop_paragraph(text, "This is the Liu Lab repo template"),
         )
+        for rel, old, new in RECORD_POINTERS:
+            self.edit(
+                rel,
+                "the citation of a record this repo does not keep",
+                lambda text, o=old, n=new: _replace(text, o, n),
+            )
 
     def prune_cli_dependency(self) -> None:
         """Take the command line's framework out of the manifest and the lock, together.
@@ -966,6 +1032,16 @@ class Init:
             return
         self.repo.write("README.md", readme(self.identity))
         self.say("wrote", "README.md")
+
+    def reset_changelog(self) -> None:
+        """Empty the changelog of the template's entries, keeping the file and its preamble."""
+        if not self.approved("CHANGELOG.md"):
+            return
+        self.edit(
+            "CHANGELOG.md",
+            "the template's own entries",
+            lambda text: truncate_at(text, CHANGELOG_UNRELEASED),
+        )
 
     def commit(self, *, do_commit: bool) -> None:
         """Stage everything, and record it as one commit."""
@@ -1217,6 +1293,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         init.say("skipped", "the rename — nothing tracked names the placeholder any more")
     init.describe()
     init.write_readme()
+    init.reset_changelog()
 
     if init.misses:
         print("\n  what it left alone\n")

@@ -60,6 +60,7 @@ pixi run docs-build
 | `scripts/check.sh` | the gate every commit has to pass |
 | `CONTEXT.md` | the glossary: the words this repo uses |
 
-Some notes are written for coding agents, not for people. They live under `docs/agents/`,
-`docs/adr/` and `docs/research/`. You will not find them in the menu or the search box,
-but the links to them still work.
+Some notes are written for coding agents, not for people. Conventions go under
+`docs/agents/`, decision records under `docs/adr/`, and research notes under
+`docs/research/`. Nothing in those three directories shows up in the menu or the search
+box, and a page written there is still reachable by its own URL.

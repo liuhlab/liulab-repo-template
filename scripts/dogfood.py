@@ -55,6 +55,17 @@ PLACEHOLDER = "new" + "pkg"
 #: them, each edited by a different anchor in `scripts/init_repo.py`.
 CLI_DEPENDENCY = "typer"
 
+#: The template's own records — how it chose its docs site, and the evidence behind the rules it
+#: ships. Spelled out here rather than imported from `scripts/init_repo.py`, for the reason the
+#: two constants above are: an assertion that reads its expectation out of the thing it is
+#: checking cannot tell a deletion that ran from a list that quietly lost an entry.
+TEMPLATE_RECORDS = (
+    "docs/adr/0001-docs-site-on-zensical.md",
+    "docs/research/github-template-mechanics-2026-08-30.md",
+    "docs/research/vale-setup-2026-08-30.md",
+    "docs/research/zensical-viability-2026-08-30.md",
+)
+
 #: The `PIXI_*` variables a parent `pixi run` exports. They name the TEMPLATE's manifest, and a
 #: nested pixi that inherited them would check this repo instead of the rendered one.
 PIXI_VARS = tuple(name for name in os.environ if name.startswith("PIXI_"))
@@ -191,6 +202,49 @@ def check_declined_cli(rung: Rung, stage: Path) -> list[str]:
     ]
 
 
+def check_template_records(stage: Path) -> list[str]:
+    """Grep a rendered repo for the template's own records, as a path and as a citation.
+
+    None of the four is about the repo that inherited it, and the rendered repo's own gate is
+    happy either way — a stale ADR passes every rule the template propagates. Citations are
+    checked with the paths because a comment pointing at a document that is not there is the
+    same residue as the document, spread over more files.
+    """
+    tracked = tracked_paths(stage)
+    problems = [
+        f"{record} is the template's own record and is still tracked"
+        for record in TEMPLATE_RECORDS
+        if record in tracked
+    ]
+    for rel in tracked:
+        path = stage / rel
+        if path.is_symlink() or not path.is_file():
+            continue
+        body = path.read_bytes()
+        problems += [
+            f"{rel} still points at {record}, which this repo does not have"
+            for record in TEMPLATE_RECORDS
+            if record.encode() in body
+        ]
+    return problems
+
+
+def check_changelog(stage: Path) -> list[str]:
+    """Read the rendered changelog: it keeps its preamble and none of the template's entries.
+
+    The file itself is never subtracted — conformance rule 8 wants one wherever `release.yml`
+    is — so what is asserted is its CONTENTS. Every Keep a Changelog entry is a list item, so
+    asking whether any list item survived tests the shape rather than the template's current
+    wording, and an entry added to this repo tomorrow cannot make this pass on nothing.
+    """
+    text = (stage / "CHANGELOG.md").read_text(encoding="utf-8")
+    return [
+        f"CHANGELOG.md still carries a template entry: {line.strip()}"
+        for line in text.splitlines()
+        if line.lstrip().startswith(("- ", "* ", "+ "))
+    ]
+
+
 def check_shape(rung: Rung, stage: Path) -> list[str]:
     """Check what the rendered repo's own gate cannot see: which files are and are not there."""
     packaged = rung.shape != "no-package"
@@ -212,7 +266,8 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
         "src": packaged,
         "tests": packaged,
         "docs/api.md": packaged,
-        # Never subtracted, at any rung.
+        # Never subtracted, at any rung. `check_changelog` asks the other half of that: the
+        # file ships, and the entries under its heading are this repo's or nobody's.
         "CHANGELOG.md": True,
         "AGENTS.md": True,
         "CONTEXT.md": True,
@@ -245,7 +300,13 @@ def render(rung: Rung, parent: Path) -> None:
     # reads `mkdocs.yml` and `docs/api.md` — both of which `init-repo` edits. `--strict` is in
     # the task, so a reference to a module this rung deleted fails here.
     run(["pixi", "run", "--locked", *manifest, "docs-build"], stage, label="pixi run docs-build")
-    problems = check_placeholder(stage) + check_shape(rung, stage) + check_declined_cli(rung, stage)
+    problems = (
+        check_placeholder(stage)
+        + check_shape(rung, stage)
+        + check_declined_cli(rung, stage)
+        + check_template_records(stage)
+        + check_changelog(stage)
+    )
     if problems:
         raise RenderError("\n".join(f"    {problem}" for problem in problems))
 
