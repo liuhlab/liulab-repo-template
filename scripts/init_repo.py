@@ -111,7 +111,6 @@ TEMPLATE_RECORDS = (
 RECORD_POINTERS = (
     ("mkdocs.yml", f"# See {TEMPLATE_ADR}.\n", ""),
     (".github/workflows/docs.yml", f" See `{TEMPLATE_ADR}`.", ""),
-    ("pyproject.toml", f" (`{TEMPLATE_VALE_NOTE}`)", ""),
     ("styles/Lab/Readability.yml", f" See `{TEMPLATE_VALE_NOTE}`.", ""),
     (
         "styles/Lab/Jargon.yml",
