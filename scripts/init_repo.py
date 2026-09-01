@@ -134,14 +134,13 @@ MARKED_BLOCKS = ((".github/workflows/ci.yml", "dogfood"), ("pyproject.toml", "do
 #: The task lines a repo with no package has no use for, matched whole.
 TASKS_A_PACKAGE_NEEDS = frozenset({'test = "pytest"', 'build = "python -m build"'})
 
-#: The command line's framework, and the three lines `pyproject.toml` declares it on: the wheel's
-#: own requirement, the comment introducing the conda mirror, and the mirror itself. A repo that
-#: declined a command line must not install the library only its command line imported, so all
-#: three go — and `drop_lock_dependency` takes the package out of `pixi.lock` with them.
+#: The command line's framework, and the two lines `pyproject.toml` declares it on: the wheel's
+#: own requirement and the conda mirror pixi installs from. A repo that declined a command line
+#: must not install the library only its command line imported, so both go — and
+#: `drop_lock_dependency` takes the package out of `pixi.lock` with them. Both anchors are the
+#: declarations themselves, never the prose near them, so rewording a comment cannot break this.
 CLI_DEPENDENCY = "typer"
-CLI_PROJECT_COMMENT = "# The command line's framework, and the only"
 CLI_PROJECT_DEPENDENCY = f'dependencies = ["{CLI_DEPENDENCY}>=0.12"]'
-CLI_PIXI_COMMENT = "# The one runtime dependency, mirrored from"
 CLI_PIXI_DEPENDENCY = f'{CLI_DEPENDENCY} = ">=0.12"'
 
 #: Committing needs an identity, and a fresh runner has none configured.
@@ -400,13 +399,10 @@ def drop_cli_dependency(text: str) -> str | None:
     Declared twice on purpose — the wheel's own requirement, and the conda mirror pixi installs
     from — so it has to be taken out twice. `[project] dependencies` is emptied rather than
     deleted: the key is where the first real dependency goes, and a wheel with no dependencies
-    says so explicitly. Each declaration's comment goes with it — a note explaining a dependency
-    that is not there any more is the same residue as the dependency.
+    says so explicitly.
     """
     anchors: tuple[Callable[[str], str | None], ...] = (
-        lambda t: drop_comment_block(t, CLI_PROJECT_COMMENT),
         lambda t: _replace(t, CLI_PROJECT_DEPENDENCY, "dependencies = []"),
-        lambda t: drop_comment_block(t, CLI_PIXI_COMMENT),
         lambda t: drop_lines(t, lambda line: line.rstrip() == CLI_PIXI_DEPENDENCY),
     )
     edited = text
