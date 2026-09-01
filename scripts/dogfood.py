@@ -50,6 +50,11 @@ ROOT = Path(__file__).resolve().parent.parent
 #: `check` honest while it is still here.
 PLACEHOLDER = "new" + "pkg"
 
+#: The command line's framework. A rung that declined a command line must not name it anywhere,
+#: and only a grep sees the whole of that: two tables in `pyproject.toml` and the lock that pins
+#: them, each edited by a different anchor in `scripts/init_repo.py`.
+CLI_DEPENDENCY = "typer"
+
 #: The `PIXI_*` variables a parent `pixi run` exports. They name the TEMPLATE's manifest, and a
 #: nested pixi that inherited them would check this repo instead of the rendered one.
 PIXI_VARS = tuple(name for name in os.environ if name.startswith("PIXI_"))
@@ -168,6 +173,24 @@ def check_placeholder(stage: Path) -> list[str]:
     return problems
 
 
+def check_declined_cli(rung: Rung, stage: Path) -> list[str]:
+    """Grep a rung that ships no command line: nothing tracked may still name the framework.
+
+    Deleting `cli.py` and `[project.scripts]` is not enough. A repo that declined a command line
+    and still installs the library only that command line imported is carrying residue, and the
+    rendered repo's own gate cannot see it — `pixi install --locked` is happy either way.
+    """
+    if rung.cli:
+        return []
+    return [
+        f"{rel} still names {CLI_DEPENDENCY}, which only the command line used"
+        for rel in tracked_paths(stage)
+        if not (stage / rel).is_symlink()
+        and (stage / rel).is_file()
+        and CLI_DEPENDENCY.encode() in (stage / rel).read_bytes()
+    ]
+
+
 def check_shape(rung: Rung, stage: Path) -> list[str]:
     """Check what the rendered repo's own gate cannot see: which files are and are not there."""
     packaged = rung.shape != "no-package"
@@ -222,7 +245,7 @@ def render(rung: Rung, parent: Path) -> None:
     # reads `mkdocs.yml` and `docs/api.md` — both of which `init-repo` edits. `--strict` is in
     # the task, so a reference to a module this rung deleted fails here.
     run(["pixi", "run", "--locked", *manifest, "docs-build"], stage, label="pixi run docs-build")
-    problems = check_placeholder(stage) + check_shape(rung, stage)
+    problems = check_placeholder(stage) + check_shape(rung, stage) + check_declined_cli(rung, stage)
     if problems:
         raise RenderError("\n".join(f"    {problem}" for problem in problems))
 
