@@ -45,3 +45,8 @@ sets one.
   ships switched off, and a comment beside it listing, from measurement, which broken links
   a strict build catches and which three it lets through. A `nav:` entry naming a file that
   is not there is one of the three, and no setting catches it.
+- A conformance rule that fails a `nav:` entry naming a file the repo does not track, or one
+  that sits outside the site source. That is the broken site the builder does not validate
+  at all — it reports no issues, exits 0, and publishes a menu item that 404s — so the check
+  had to go somewhere it could be one. It reads every site config, so a repo building more
+  than one site from one docs tree has both navs checked.

@@ -5,7 +5,7 @@
     python scripts/conformance.py [--root PATH]
 
 It states the RULE, not the file contents — a pull model, so a repo that legitimately diverges
-stays green while the shared conventions stay checked. Fourteen rules: twelve fail, two only warn.
+stays green while the shared conventions stay checked. Fifteen rules: thirteen fail, two only warn.
 
 Three things it does on purpose:
 
@@ -56,7 +56,7 @@ import yaml
 #: neither happens.
 PLACEHOLDER = "new" + "pkg"
 
-#: Rule 1 and warning 12 are both gated on this directory, and it is the only discriminator either
+#: Rule 1 and warning 14 are both gated on this directory, and it is the only discriminator either
 #: needs. While it is here, `init-repo` has not run: the placeholder is still the repo's own name,
 #: and the auto-discovered skill is itself the nag. Once it is gone the repo claims to be its own,
 #: and both rules start checking.
@@ -65,9 +65,20 @@ INIT_SKILL = "skills/init-repo"
 #: Rule 1's name, needed by name because it is the one rule that refuses to be waived.
 UNWAIVABLE = "placeholder-rename"
 
-#: Where `mkdocs.yml` puts the site source when it does not say. Rule 2 is scoped to the pages the
-#: site publishes, so it reads this rather than assuming.
+#: The site configuration every repo that publishes a site has, and where the site source sits
+#: when it does not say. Rules 2 and 13 are both scoped to the pages the site publishes, so they
+#: read the declared source rather than assuming it.
+SITE_CONFIG = "mkdocs.yml"
 DEFAULT_DOCS_DIR = "docs"
+
+#: A site configuration AT THE REPO ROOT, `mkdocs.yml` and any variant beside it. Root-anchored,
+#: so an example config under `docs/` is a document and not a configuration.
+#:
+#: Rule 13 reads every one of them, not only `SITE_CONFIG`, because a repo may build more than one
+#: site from one docs tree: a second configuration `INHERIT`s the first and APPENDS to its nav,
+#: and the navbar the build renders carries the entries of both. A repo with one configuration
+#: reads one, and this costs nothing.
+_SITE_CONFIG_RE = re.compile(r"^mkdocs(?:\..+)?\.ya?ml$")
 
 #: Where GitHub reads workflows, and the two file endings it accepts. Nothing below this
 #: directory is a workflow, and nothing above it is read.
@@ -86,7 +97,7 @@ VALE_ON = {"YES", "TRUE", "ON"}
 VALE_OFF = {"NO", "FALSE", "OFF"}
 
 #: The command a workflow step is allowed to run, and the table its task must be declared in.
-#: Both are named here because rule 11's problem text and its fix both spell them.
+#: Both are named here because rule 12's problem text and its fix both spell them.
 PIXI_RUN = "pixi run"
 TASK_TABLE = "[tool.pixi.tasks]"
 
@@ -176,9 +187,9 @@ class _TolerantLoader(yaml.SafeLoader):
     """A SafeLoader that reads a config it does not fully understand.
 
     mkdocs configurations carry local tags — `!ENV`, `!!python/name:...` for an emoji index — and
-    a plain `safe_load` raises on the first one. Rule 2 only wants `nav:` and `docs_dir:`, so an
-    unknown tag becomes ``None`` rather than an exception: a derived repo that adds one must not
-    turn a conformance rule into a crash.
+    a plain `safe_load` raises on the first one. Rules 2 and 13 only want `nav:`, `docs_dir:` and
+    `INHERIT:`, so an unknown tag becomes ``None`` rather than an exception: a derived repo that
+    adds one must not turn a conformance rule into a crash.
     """
 
 
@@ -317,6 +328,33 @@ def _steps(path: str, document: dict[Any, Any]) -> tuple[Step, ...]:
     return tuple(steps)
 
 
+@dataclass(frozen=True)
+class SiteConfig:
+    """One site configuration, and the nav entries it contributes to a build.
+
+    Attributes
+    ----------
+    path
+        Repo-relative path of the configuration file, e.g. `mkdocs.yml`.
+    docs_dir
+        The site source this file resolves its nav paths against, repo-relative, without a
+        trailing slash, and AFTER `INHERIT`: a configuration that inherits another and names no
+        source of its own resolves against the parent's.
+    declares_nav
+        Whether the file has a `nav:` key at all. A configuration with none is not one whose nav
+        is empty — the generator builds the navbar from the directory tree instead — so a rule
+        reports it as unchecked rather than green.
+    targets
+        Repo-relative path -> the nav string that named it, for every entry that names a page
+        rather than a link or a bare anchor.
+    """
+
+    path: str
+    docs_dir: str
+    declares_nav: bool
+    targets: dict[str, str]
+
+
 @dataclass
 class Repo:
     """The tree under inspection and the declarations it makes about itself."""
@@ -353,37 +391,92 @@ class Repo:
         """Whether anything tracked lives under a directory prefix."""
         return any(p.startswith(prefix) for p in self.tracked)
 
+    def config(self, rel: str) -> dict[str, Any]:
+        """One site configuration file, parsed, or an empty mapping when it is not there.
+
+        A file that will not parse, or that is not a mapping, becomes an empty configuration
+        rather than an exception, exactly as `workflows` does: a derived repo's unusual site
+        config must not turn a conformance rule into a crash.
+        """
+        text = self.read(rel)
+        if text is None:
+            return {}
+        try:
+            # Not `safe_load`: `_TolerantLoader` is SafeLoader plus a shrug at unknown tags.
+            loaded = yaml.load(text, Loader=_TolerantLoader)
+        except yaml.YAMLError:
+            loaded = None
+        return loaded if isinstance(loaded, dict) else {}
+
+    def resolved_docs_dir(self, rel: str) -> str:
+        """One configuration's site source, resolved along the `INHERIT` chain.
+
+        Walked rather than read from the one file, because a configuration that inherits another
+        and declares no `docs_dir` of its own uses the parent's, and reading only the child would
+        resolve its nav against a directory that is not the site source. `INHERIT` is a path
+        relative to the configuration that writes it.
+
+        The visited set is not defensive clutter: a cycle is a configuration nobody can build, and
+        it must not be a conformance crash either.
+        """
+        seen: set[str] = set()
+        while rel not in seen:
+            seen.add(rel)
+            document = self.config(rel)
+            declared = document.get("docs_dir")
+            if isinstance(declared, str):
+                return posixpath.normpath(declared).strip("/")
+            parent = document.get("INHERIT")
+            if not isinstance(parent, str):
+                break
+            rel = posixpath.normpath(posixpath.join(posixpath.dirname(rel), parent))
+        return DEFAULT_DOCS_DIR
+
     @cached_property
     def mkdocs(self) -> dict[str, Any]:
         """`mkdocs.yml`, or an empty mapping when the repo publishes no site."""
-        text = self.read("mkdocs.yml")
-        if text is None:
-            return {}
-        # Not `safe_load`: `_TolerantLoader` is SafeLoader plus a shrug at unknown tags.
-        loaded = yaml.load(text, Loader=_TolerantLoader)
-        return loaded if isinstance(loaded, dict) else {}
+        return self.config(SITE_CONFIG)
 
     @cached_property
     def docs_dir(self) -> str:
         """The site source directory, repo-relative and without a trailing slash."""
-        declared = self.mkdocs.get("docs_dir", DEFAULT_DOCS_DIR)
-        return posixpath.normpath(str(declared)).strip("/")
+        return self.resolved_docs_dir(SITE_CONFIG)
 
     @cached_property
     def nav(self) -> dict[str, str]:
-        """Repo-relative path -> the `nav:` entry that names it.
+        """Repo-relative path -> the `mkdocs.yml` nav entry that names it."""
+        return _nav_targets(self.docs_dir, self.mkdocs.get("nav"))
 
-        Nav paths are relative to `docs_dir`, so they are prefixed with it before they can be
-        compared with anything `git ls-files` said. Getting that wrong is not a false negative
-        that shows up later — it makes rule 2 pass vacuously, which is the failure this whole file
-        exists to prevent. External links are skipped: a nav entry may be a URL.
+    @cached_property
+    def site_configs(self) -> tuple[SiteConfig, ...]:
+        """Every tracked site configuration, in path order, with the nav each contributes.
+
+        TRACKED, like `workflows` and for the same reason: a configuration no checkout carries
+        builds no site.
+
+        EVERY one of them and not just `SITE_CONFIG`, because `INHERIT` joins navs rather than
+        replacing them: a configuration that inherits another and writes a `nav:` of its own adds
+        to the inherited list, and the navbar the build renders carries both. So the entries a
+        build renders are the UNION across the files. A rule reading one file would pass the
+        other's dead entry, and a rule merging them into a single nav would have to know which
+        file won; the union needs neither, because an entry is checked where it was written. A
+        repo with one configuration reads one, and this costs nothing.
         """
-        entries: dict[str, str] = {}
-        for raw in _walk_strings(self.mkdocs.get("nav")):
-            if "://" in raw or raw.startswith("#"):
+        found: list[SiteConfig] = []
+        for rel in self.tracked:
+            if not _SITE_CONFIG_RE.match(rel):
                 continue
-            entries[posixpath.normpath(f"{self.docs_dir}/{raw}")] = raw
-        return entries
+            document = self.config(rel)
+            docs_dir = self.resolved_docs_dir(rel)
+            found.append(
+                SiteConfig(
+                    path=rel,
+                    docs_dir=docs_dir,
+                    declares_nav="nav" in document,
+                    targets=_nav_targets(docs_dir, document.get("nav")),
+                )
+            )
+        return tuple(found)
 
     @cached_property
     def manifest(self) -> dict[str, Any]:
@@ -452,6 +545,31 @@ def _walk_strings(node: Any) -> Iterator[str]:
     elif isinstance(node, dict):
         for value in node.values():  # pyright: ignore[reportUnknownVariableType]
             yield from _walk_strings(value)
+
+
+#: A nav entry that is not a path into the site source. A URL with a scheme, a protocol-relative
+#: one, or a bare anchor on the page the reader is already on — none of them names a file, so none
+#: is a file that can be missing. The scheme half is what covers `mailto:`, which has no `//`.
+_NAV_LINK_RE = re.compile(r"^[a-z][a-z0-9+.\-]*:|^//|^#", re.IGNORECASE)
+
+
+def _nav_targets(docs_dir: str, nav: Any) -> dict[str, str]:
+    """Repo-relative path -> the `nav:` entry that named it, for one site configuration.
+
+    Nav paths are relative to `docs_dir`, so they are prefixed with it before they can be compared
+    with anything `git ls-files` said. Getting that wrong is not a false negative that shows up
+    later — it makes rule 2 pass vacuously, which is the failure this whole file exists to prevent.
+
+    Rules 2 and 13 read the same mapping, so what counts as a nav path is decided once. `normpath`
+    is what lets rule 13 see an entry reaching ABOVE the site source: `../README.md` under `docs/`
+    arrives here as `README.md`, outside the directory the builder copies.
+    """
+    targets: dict[str, str] = {}
+    for raw in _walk_strings(nav):
+        if _NAV_LINK_RE.match(raw):
+            continue
+        targets[posixpath.normpath(f"{docs_dir or '.'}/{raw}")] = raw
+    return targets
 
 
 def _task_names(node: Any) -> Iterator[str]:
@@ -637,7 +755,7 @@ def _python_pins(pyproject: dict[str, Any]) -> dict[str, str]:
     """Every pixi `python` pin, keyed by the table header that holds it.
 
     Features are read as well as the default table, because a repo that really supports a range
-    gives its floor an environment to resolve in, and rule 10 says so in its notes. A pin may be
+    gives its floor an environment to resolve in, and rule 11 says so in its notes. A pin may be
     written `python = "3.13.*"` or `python = { version = "3.13.*" }`; both are the same claim.
     """
     tables: set[tuple[str, ...]] = {("tool", "pixi", "dependencies")}
@@ -654,7 +772,7 @@ def _python_pins(pyproject: dict[str, Any]) -> dict[str, str]:
 
 
 # --------------------------------------------------------------------------------------
-# The rules. Twelve fail, two warn. Each returns what it found; nothing here exits or prints.
+# The rules. Thirteen fail, two warn. Each returns what it found; nothing here exits or prints.
 # --------------------------------------------------------------------------------------
 
 
@@ -1197,8 +1315,77 @@ def rule_workflow_step_tasks(repo: Repo) -> Result:
     return result
 
 
+def rule_nav_target_exists(repo: Repo) -> Result:
+    """13. Every `nav:` entry names a tracked page under that configuration's site source.
+
+    TRACKED and not merely present, because CI builds from a checkout. The one shape that
+    legitimately fails is a repo GENERATING pages into the site source at build time, whose
+    entries name nothing this can see; `[tool.liulab.waived]` is the answer there, and it is
+    printed on every run so the choice stays visible.
+    """
+    result = Result()
+    if not repo.site_configs:
+        result.notes.append(
+            f"not checked: no tracked {SITE_CONFIG}, so this repo publishes no site"
+        )
+        return result
+    tracked = set(repo.tracked)
+    for config in repo.site_configs:
+        # A file with no `nav:` at all has not passed: the generator builds the navbar from the
+        # directory tree instead, and there is no entry to resolve. Reported per configuration,
+        # so a repo whose second config only overrides the identity says so rather than looking
+        # like one whose nav was checked.
+        if not config.declares_nav:
+            result.notes.append(
+                f"not checked: {config.path} declares no `nav:`, so the site builds its navbar "
+                "from the directory tree and names no page for this rule to resolve"
+            )
+            continue
+        prefix = f"{config.docs_dir}/" if config.docs_dir not in {"", "."} else ""
+        for target, raw in sorted(config.targets.items()):
+            # OUTSIDE the site source first, because such a target usually does exist — and a
+            # file that is right there is the case a "does it exist" test calls fine. It is the
+            # same broken menu item, so it is the same rule, with the fix it actually needs.
+            if prefix and not target.startswith(prefix):
+                result.problems.append(
+                    _problem(
+                        f"{config.path} nav entry `{raw}` resolves to {target}, outside {prefix}",
+                        "a nav path is read relative to the site source, and the builder renders "
+                        "that directory and nothing else. A target above it is not a page the "
+                        "site has, so the menu item 404s exactly as a missing file does — and the "
+                        "file being right there is what makes it read as correct",
+                        f"move the page under {prefix}, or write the entry as a URL if it is a "
+                        "link out rather than a page of this site",
+                    )
+                )
+            elif target not in tracked:
+                # A file that is present but untracked builds on the laptop that wrote it and
+                # nowhere else. Same failure, and worth saying apart, because "it is right there"
+                # is exactly what the person reading this will be about to say.
+                loose = (
+                    " The file is present on disk but untracked, and CI builds from a checkout."
+                    if repo.exists(target)
+                    else ""
+                )
+                result.problems.append(
+                    _problem(
+                        f"{config.path} nav entry `{raw}` names {target}, which is not tracked",
+                        "the site generator does not validate the nav at all: the build reports "
+                        "no issues, exits 0, and publishes a menu item whose link points at a "
+                        f"page that was never rendered.{loose} No build setting turns this on, "
+                        "which is why the check is here",
+                        f"add {target}, correct the entry, or delete it from the `nav:` list in "
+                        f"{config.path}",
+                    )
+                )
+        result.notes.append(
+            f"{config.path}: {len(config.targets)} nav entry(s) against {prefix or 'the repo root'}"
+        )
+    return result
+
+
 def warning_init_sentinel(repo: Repo) -> Result:
-    """13. `AGENTS.md` still carries the line telling you to run `/init`."""
+    """14. `AGENTS.md` still carries the line telling you to run `/init`."""
     result = Result()
     if repo.exists(INIT_SKILL):
         result.notes.append(f"not checked: {INIT_SKILL}/ is here, and that skill is the nag")
@@ -1321,6 +1508,14 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         13,
+        "nav-target-exists",
+        "every `nav:` entry in every tracked site configuration names a tracked file under that "
+        "configuration's site source. This is the one broken site the generator does not validate "
+        "at all — it builds green, reports no issues, and publishes a menu item that 404s",
+        rule_nav_target_exists,
+    ),
+    Rule(
+        14,
         "init-sentinel",
         "AGENTS.md is still the template's generic copy",
         warning_init_sentinel,
@@ -1328,9 +1523,9 @@ RULES: tuple[Rule, ...] = (
     ),
 )
 
-#: Warning 14 is not a rule with a tree to inspect: it is the waiver table itself, printed on
+#: Warning 15 is not a rule with a tree to inspect: it is the waiver table itself, printed on
 #: every run. It lives in `report` because only the reporter knows what each waiver suppressed.
-WAIVER_RULE = (14, "waivers")
+WAIVER_RULE = (15, "waivers")
 
 
 def load(root: Path) -> Repo:
@@ -1381,7 +1576,7 @@ def _verdict(repo: Repo, rule: Rule, result: Result) -> tuple[str, list[str]]:
 
 
 def _waiver_lines(repo: Repo, results: list[tuple[Rule, Result]]) -> list[str]:
-    """Warning 14: every waiver, with what it actually suppressed.
+    """Warning 15: every waiver, with what it actually suppressed.
 
     A waiver naming no rule is called out rather than ignored, and so is one naming rule 1, which
     refuses to be waived. A waiver that quietly does nothing is the same invisible escape hatch
