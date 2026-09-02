@@ -58,6 +58,13 @@ sets one.
 
 ### Changed
 
+- The conformance rule about the publishing trigger now reads a tag filter instead of refusing
+  every one. A `push:` with no branch filter and a `create:` still fail, because an absent
+  filter is every ref and neither has a correct form. A `tags:` or `tags-ignore:` filter is
+  read, and it fails only where it lets the first-day `v0.0.0` tag through — so `tags:
+  ['v20*']`, which CalVer versions can never match, now passes. The rule reads one path,
+  `.github/workflows/release.yml`, and its own report says so: the same trigger under another
+  filename is outside it.
 - `conformance` now exits 2 when it could not run at all: no `.git`, no `pyproject.toml`, or
   a `pyproject.toml` it cannot read. It still exits 1 when it ran and a rule failed, and 0
   when every rule passed. Both used to exit 1, so a bad checkout looked just like a repo that

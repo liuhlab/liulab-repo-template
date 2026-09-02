@@ -41,6 +41,7 @@ gate that fires on nothing looks identical to a gate that passes.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import posixpath
 import re
 import shlex
@@ -115,6 +116,10 @@ WORKFLOW_SUFFIXES = (".yml", ".yaml")
 #: and the repo cannot publish at all. `init-repo` also deletes it by this exact path. Rules 8 and
 #: 9 both read it, so the name is written here once and nowhere else.
 RELEASE_WORKFLOW = f"{WORKFLOW_DIR}release.yml"
+
+#: The tag `init_repo.py` creates on a repo's opening day, and the one ref rule 9 asks about. A
+#: trigger that admits it runs the publishing workflow before anyone has decided to release.
+FIRST_TAG = "v0.0.0"
 
 #: Vale's spelling of on and off. Both forms appear in the wild; the gate accepts either.
 VALE_ON = {"YES", "TRUE", "ON"}
@@ -1088,27 +1093,69 @@ def rule_repo_shape(repo: Repo) -> Result:
     return result
 
 
-def _tag_push_events(workflow: Workflow) -> list[str]:
-    """List the triggers in one workflow that pushing a tag can fire, spelled as they are written.
+def _matches(patterns: Any, ref: str) -> bool | None:
+    """Whether a GitHub ref filter matches one ref, or ``None`` where it cannot be read.
 
-    Three of them, and only the first is the one people think of:
+    The filter syntax is `fnmatch` plus a leading `!` that excludes, and the LAST pattern to
+    match decides. That is the whole of the semantics and the whole of this function.
 
-    - `push:` with a `tags:` or `tags-ignore:` filter — the trigger written on purpose.
-    - `push:` naming no branch filter at all. An absent filter is not "no refs", it is EVERY
-      ref, so a bare `push:` fires on a tag exactly as it fires on a branch. `paths:` narrows
-      which files, never which refs.
+    The two places the dialects differ cannot change this answer for `FIRST_TAG`. GitHub's `*`
+    stops at a `/` where `fnmatch`'s does not, and `v0.0.0` has no `/`. GitHub's `+` is a
+    quantifier that `fnmatch` reads as a literal `+`, which can only turn a match into a miss —
+    and a miss is the answer that lets a workflow through, never the one that fails a correct
+    one.
+
+    ``None`` is what a caller cannot clear a workflow on: a filter written as something other
+    than strings is one this cannot read, and every caller reads that as the hazard.
+    """
+    if isinstance(patterns, str):
+        patterns = [patterns]
+    if not isinstance(patterns, list) or not patterns:
+        return None
+    matched = False
+    for pattern in patterns:  # pyright: ignore[reportUnknownVariableType]
+        if not isinstance(pattern, str):
+            return None
+        if fnmatch.fnmatchcase(ref, pattern.removeprefix("!")):
+            matched = not pattern.startswith("!")
+    return matched
+
+
+def _first_tag_events(workflow: Workflow) -> list[str]:
+    """List the triggers in one workflow that pushing `FIRST_TAG` fires, spelled as written.
+
+    Two of them are the same mistake — an absent filter is not "no refs", it is EVERY ref — and
+    they have no legitimate form, so they are listed whenever they appear:
+
+    - `push:` naming no branch filter at all, which fires on a tag exactly as on a branch.
+      `paths:` narrows which files, never which refs.
     - `create`, which fires on a branch or a tag coming into existence, and a pushed tag is a
       tag coming into existence.
 
-    A `push:` that names `branches:` or `branches-ignore:` is a branch trigger and is absent
-    from this list: naming any branch filter is what stops tags reaching the workflow.
+    A `tags:` or `tags-ignore:` filter is the other shape, and it is a DECISION rather than an
+    accident: someone wrote down which tags reach this workflow. So it is READ, not refused, and
+    listed only where it lets `FIRST_TAG` through. Under CalVer `vYYYY.M.PATCH` a filter like
+    `tags: ['v20*']` cannot match `v0.0.0`, and such a workflow is not listed here.
+
+    A `push:` that names `branches:` or `branches-ignore:` and no tag filter is a branch trigger
+    and is absent from this list: naming any branch filter is what stops tags reaching it.
     """
     fired: list[str] = []
     if "push" in workflow.triggers:
         config = workflow.triggers["push"]
         config = config if isinstance(config, dict) else {}
-        if "tags" in config or "tags-ignore" in config:
-            fired.append("`on: push:` names `tags:`")
+        if "tags" in config:
+            # Read even where `branches:` is also written: the two filters are a union, so a
+            # branch filter beside a tag filter narrows nothing about tags.
+            if _matches(config["tags"], FIRST_TAG) is not False:
+                fired.append(f"`on: push:` has a `tags:` filter that admits `{FIRST_TAG}`")
+        elif "tags-ignore" in config:
+            # The same call inverted. `tags-ignore:` fires on every tag its list does NOT match,
+            # so the hazard is gone only where the list provably matches `FIRST_TAG`.
+            if _matches(config["tags-ignore"], FIRST_TAG) is not True:
+                fired.append(
+                    f"`on: push:` has a `tags-ignore:` filter that does not exclude `{FIRST_TAG}`"
+                )
         elif not ("branches" in config or "branches-ignore" in config):
             fired.append("`on: push:` names no branch filter, so it fires on every ref, tags too")
     if "create" in workflow.triggers:
@@ -1117,23 +1164,34 @@ def _tag_push_events(workflow: Workflow) -> list[str]:
 
 
 def rule_release_trigger(repo: Repo) -> Result:
-    """9. Nothing a tag push fires can trigger the publishing workflow."""
+    """9. Nothing a `FIRST_TAG` push fires can trigger the publishing workflow.
+
+    KNOWN LIMIT, stated rather than closed: this reads one path, `RELEASE_WORKFLOW`, so the same
+    trigger in a workflow under any other name is outside the rule and `git mv` clears it. The
+    path is not a guess — a package index binds its trusted publisher to a workflow FILENAME, so
+    renaming the file is a change to external configuration and not a way around a check — but a
+    repo that publishes under another name is a repo this rule says nothing about. Closing that
+    would mean reading every workflow's steps for whatever action publishes, which is a list
+    nobody can keep, on every repo made from here. The narrow rule is the honest one.
+    """
     result = Result()
     publishing = [w for w in repo.workflows if w.path == RELEASE_WORKFLOW]
     if not publishing:
         result.notes.append(
-            f"not checked: no {RELEASE_WORKFLOW}, so this repo publishes to no package index"
+            f"not checked: no {RELEASE_WORKFLOW}. This rule reads that one path — the filename a "
+            "package index binds a trusted publisher to — so a publishing workflow under any "
+            "other name is outside it"
         )
         return result
     for workflow in publishing:
-        for fired in _tag_push_events(workflow):
+        for fired in _first_tag_events(workflow):
             result.problems.append(
                 _problem(
                     f"{workflow.path} can be triggered by a tag push: {fired}",
-                    "publishing is the one act in this toolchain that cannot be undone — a "
-                    "version can be neither unpublished nor reused — and `init-repo` pushes a "
-                    "first tag on a repo's opening day, so this trigger publishes from a repo "
-                    "nobody has finished naming",
+                    f"`init-repo` pushes `{FIRST_TAG}` on a repo's opening day and a "
+                    "`git push --tags` pushes every tag at once, so this trigger runs the "
+                    "publishing workflow with nobody having decided to release anything. "
+                    "Publishing a GitHub Release is that decision, written down",
                     "trigger it on `release:` with `types: [published]`, which is a person "
                     "publishing a GitHub Release on purpose, and add `workflow_dispatch:` for "
                     "re-running one that failed",
@@ -1504,8 +1562,9 @@ RULES: tuple[Rule, ...] = (
     Rule(
         9,
         "release-trigger",
-        f"{RELEASE_WORKFLOW} is triggered by publishing a GitHub Release and by nothing a tag "
-        "push fires — not `push: tags:`, not a `push:` with no branch filter, not `create`",
+        f"{RELEASE_WORKFLOW} names no trigger a `{FIRST_TAG}` push fires — not a `push:` with no "
+        "branch filter, not `create`, and not a `tags:` filter that admits it. A tag filter that "
+        f"cannot match `{FIRST_TAG}` is read and allowed; this rule reads that one path only",
         rule_release_trigger,
     ),
     Rule(

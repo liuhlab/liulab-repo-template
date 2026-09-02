@@ -529,14 +529,71 @@ def test_rule_8_is_satisfied_and_not_merely_skipped_when_both_premises_hold(repo
     assert statuses(proc)["repo-shape"] == "ok"
 
 
-def test_rule_9_fires_on_a_publishing_workflow_triggered_by_a_tag_push(repo: Path) -> None:
+def test_rule_9_fires_on_a_tag_filter_that_admits_the_first_tag(repo: Path) -> None:
     publishes(repo, "on:\n  push:\n    tags: ['v*']\n")
     proc = conformance(repo)
     assert proc.returncode == 1
     assert statuses(proc)["release-trigger"] == "FAIL"
-    assert f"{RELEASE_YML} can be triggered by a tag push: `on: push:` names `tags:`" in proc.stderr
-    assert "cannot be undone" in flat(proc.stderr)  # the rule and the fix, not a rewritten assert
+    assert (
+        f"{RELEASE_YML} can be triggered by a tag push: `on: push:` has a `tags:` filter that "
+        "admits `v0.0.0`" in proc.stderr
+    )
+    # The why has to be true of every tree it prints on, so it names the first-day tag rather
+    # than irreversibility: this rule also prints on a release.yml that publishes no package.
+    assert "pushes `v0.0.0` on a repo's opening day" in flat(proc.stderr)
     assert "trigger it on `release:` with `types: [published]`" in flat(proc.stderr)
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [
+        # CalVer is `vYYYY.M.PATCH`, so neither of these can match `v0.0.0` at all.
+        "['v20*']",
+        "['v[1-9]*']",
+        # The exclusion written out, which is a decision and not an accident.
+        "['v*', '!v0.0.0']",
+    ],
+)
+def test_rule_9_allows_a_tag_filter_that_cannot_match_the_first_tag(repo: Path, tags: str) -> None:
+    # The measured misfire this rule was narrowed to remove. A filter someone wrote down is read,
+    # not refused, and a filter that excludes the hazard by construction has nothing to fix.
+    publishes(repo, f"on:\n  push:\n    tags: {tags}\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["release-trigger"] == "ok"
+
+
+def test_rule_9_allows_a_tags_ignore_that_excludes_the_first_tag(repo: Path) -> None:
+    publishes(repo, "on:\n  push:\n    tags-ignore: ['v0.0.0']\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["release-trigger"] == "ok"
+
+
+def test_rule_9_fires_on_a_tags_ignore_that_leaves_the_first_tag_through(repo: Path) -> None:
+    # The same call inverted: this fires on every tag but `v9.*`, `v0.0.0` included.
+    publishes(repo, "on:\n  push:\n    tags-ignore: ['v9.*']\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["release-trigger"] == "FAIL"
+    assert "`tags-ignore:` filter that does not exclude `v0.0.0`" in proc.stderr
+
+
+def test_rule_9_reads_a_tag_filter_it_cannot_parse_as_admitting_the_first_tag(repo: Path) -> None:
+    # Conservative, and the one direction that has to be: a filter this cannot read is not a
+    # filter it can clear a workflow on.
+    publishes(repo, "on:\n  push:\n    tags:\n      - pattern: v*\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["release-trigger"] == "FAIL"
+
+
+def test_rule_9_reads_the_tag_filter_even_beside_a_branch_filter(repo: Path) -> None:
+    # `branches:` and `tags:` in one `push:` are a union, so a branch filter narrows no tags.
+    publishes(repo, "on:\n  push:\n    branches: [main]\n    tags: ['v*']\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["release-trigger"] == "FAIL"
 
 
 def test_rule_9_fires_on_a_push_with_no_branch_filter(repo: Path) -> None:
@@ -584,9 +641,22 @@ def test_rule_9_is_vacuous_and_not_passing_when_the_repo_publishes_nothing(repo:
     proc = conformance(repo)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert statuses(proc)["release-trigger"] == "--"
-    assert f"not checked: no {RELEASE_YML}, so this repo publishes to no package index" in flat(
-        proc.stdout
+    assert f"not checked: no {RELEASE_YML}" in flat(proc.stdout)
+
+
+def test_rule_9_says_it_reads_one_path_and_the_rename_that_leaves_it(repo: Path) -> None:
+    # The known limit, stated where someone meets it rather than closed with a content sniffer:
+    # the same trigger under another filename is outside this rule, and the vacuous run says so.
+    write(
+        repo,
+        ".github/workflows/publish.yml",
+        "name: publish\non:\n  push:\n    tags: ['v*']\njobs:\n  build:\n"
+        "    runs-on: ubuntu-latest\n    steps:\n      - run: pixi run build\n",
     )
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["release-trigger"] == "--"
+    assert "a publishing workflow under any other name is outside it" in flat(proc.stdout)
 
 
 def test_warning_14_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> None:
