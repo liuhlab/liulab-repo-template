@@ -49,7 +49,9 @@ sets one.
   that a parameter is annotated at all — the bar was kept by discipline and nothing would
   have noticed a repo dropping it. Its sibling `reportUnknownParameterType` was considered
   and declined: it also fails parameters that *are* annotated when the type belongs to an
-  untyped dependency, which is not a bar a lab repo can hold.
+  untyped dependency, which is not a bar a lab repo can hold. `tests/` is scoped back to
+  plain `standard`, because the rule fired on fixtures and `parametrize` arguments, where
+  the annotation it asks for is a claim nothing compares to the fixture.
 - A conformance rule that fails a `nav:` entry naming a file the repo does not track, or one
   that sits outside the site source. That is the broken site the builder does not validate
   at all — it reports no issues, exits 0, and publishes a menu item that 404s — so the check
