@@ -7,7 +7,7 @@ checked by no rule at all, with zero alerts and green CI. So the claim these tes
 
 Every test builds a tmp_path tree that is correct in every respect but one, and asserts the run
 marks THAT rule FAIL and names the offending file. The rule name alone would prove nothing: the
-status table prints all eleven names on every run, passing or failing, so the assertions read the
+status table prints all twelve names on every run, passing or failing, so the assertions read the
 status word out of the table rather than grepping the output for a name.
 
 Conformance is invoked as a SUBPROCESS, so what is under test is the command an agent runs and
@@ -88,6 +88,11 @@ nav:
       - API: api.md
 """
 
+# The publishing workflow, spelled out here rather than imported from the checker: a test that
+# borrowed the path would agree with rule 9 by construction and prove nothing about the
+# convention. Rule 8 wants a CHANGELOG.md wherever this file is, so `publishes` writes both.
+RELEASE_YML = ".github/workflows/release.yml"
+
 _STATUS_RE = re.compile(
     r"^\s+(?:rule|warn) \d+\s+(?P<name>\S+)\s+(?P<status>ok|FAIL|--|warn|waived)(\s|$)"
 )
@@ -99,6 +104,26 @@ def write(root: Path, rel: str, text: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     return path
+
+
+def publishes(root: Path, on: str) -> None:
+    """Give the tree a publishing workflow with one `on:` block, and the changelog rule 8 wants.
+
+    The body is a real job with real steps, not a bare `on:` block: the accessor the rule reads
+    parses the whole file, and a fixture that carried triggers alone would never exercise that.
+    """
+    write(
+        root,
+        RELEASE_YML,
+        f"name: release\n{on}"
+        "jobs:\n"
+        "  build:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v7\n"
+        "      - run: pixi run build\n",
+    )
+    write(root, "CHANGELOG.md", "# Changelog\n\nNothing yet.\n")
 
 
 def add_skill(root: Path, name: str) -> None:
@@ -114,9 +139,10 @@ def add_skill(root: Path, name: str) -> None:
 def repo(tmp_path: Path) -> Path:
     """A tree that passes every rule, for one test to break in exactly one way.
 
-    It has no `src/` and no release workflow, so rule 8's two conditionals are both vacuous here;
-    the tests that care add the premise. It has no `skills/init-repo/`, so rule 1 and warning 9
-    are both live — the state a derived repo is in, and the only state where they check anything.
+    It has no `src/` and no release workflow, so rule 8's two conditionals and rule 9 are all
+    vacuous here; the tests that care add the premise, rule 9's through `publishes`. It has no
+    `skills/init-repo/`, so rule 1 and warning 11 are both live — the state a derived repo is in,
+    and the only state where they check anything.
     """
     root = tmp_path / "repo"
     write(root, "pyproject.toml", PYPROJECT)
@@ -157,7 +183,7 @@ def statuses(proc: subprocess.CompletedProcess[str]) -> dict[str, str]:
     """The verdict the run gave each rule, read off its own status table.
 
     Asserting on the status word rather than on the presence of a rule NAME is the point: the
-    table prints all eleven names on every run, so `"repo-shape" in output` is true of a green run
+    table prints all twelve names on every run, so `"repo-shape" in output` is true of a green run
     and would prove nothing at all.
     """
     found: dict[str, str] = {}
@@ -186,6 +212,7 @@ def test_the_fixture_tree_passes_every_rule(repo: Path) -> None:
         "skill-name-prefix",
         "skill-symlinks",
         "repo-shape",
+        "release-trigger",
         "init-sentinel",
         "single-toolchain",
         "waivers",
@@ -229,7 +256,7 @@ def test_rule_1_fires_on_a_placeholder_in_a_path_not_only_in_a_file(repo: Path) 
 
 def test_rule_1_is_not_checked_while_the_init_skill_is_there(repo: Path) -> None:
     # The template ships the placeholder ON PURPOSE, and `skills/init-repo/` is what says the
-    # rename has not happened yet. Same discriminator warning 9 uses.
+    # rename has not happened yet. Same discriminator warning 11 uses.
     write(repo, "README.md", f"# liulab-{PLACEHOLDER}\n\nStill the template.\n")
     add_skill(repo, "init-repo")
     proc = conformance(repo)
@@ -249,7 +276,7 @@ def test_rule_1_refuses_to_be_waived(repo: Path) -> None:
     assert proc.returncode == 1
     assert statuses(proc)["placeholder-rename"] == "FAIL"
     assert "cannot be waived" in proc.stderr
-    assert "REFUSED" in proc.stdout  # and warning 11 still prints it
+    assert "REFUSED" in proc.stdout  # and warning 12 still prints it
 
 
 def test_rule_2_fires_on_a_page_that_is_not_excluded_from_search(repo: Path) -> None:
@@ -402,7 +429,67 @@ def test_rule_8_is_satisfied_and_not_merely_skipped_when_both_premises_hold(repo
     assert statuses(proc)["repo-shape"] == "ok"
 
 
-def test_warning_9_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> None:
+def test_rule_9_fires_on_a_publishing_workflow_triggered_by_a_tag_push(repo: Path) -> None:
+    publishes(repo, "on:\n  push:\n    tags: ['v*']\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["release-trigger"] == "FAIL"
+    assert f"{RELEASE_YML} can be triggered by a tag push: `on: push:` names `tags:`" in proc.stderr
+    assert "cannot be undone" in flat(proc.stderr)  # the rule and the fix, not a rewritten assert
+    assert "trigger it on `release:` with `types: [published]`" in flat(proc.stderr)
+
+
+def test_rule_9_fires_on_a_push_with_no_branch_filter(repo: Path) -> None:
+    # The hole a rule written only for `tags:` would leave wide open. An absent filter is not
+    # "no refs" — GitHub reads it as every ref, so this fires on `v0.0.0` like any other.
+    publishes(repo, "on:\n  push:\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["release-trigger"] == "FAIL"
+    assert "`on: push:` names no branch filter, so it fires on every ref, tags too" in proc.stderr
+
+
+def test_rule_9_fires_on_create_which_a_pushed_tag_also_fires(repo: Path) -> None:
+    publishes(repo, "on:\n  create:\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["release-trigger"] == "FAIL"
+    assert "`on: create:` fires when a tag comes into existence" in proc.stderr
+
+
+def test_rule_9_passes_a_workflow_triggered_by_a_published_release(repo: Path) -> None:
+    publishes(repo, "on:\n  release:\n    types: [published]\n  workflow_dispatch:\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["release-trigger"] == "ok"
+    # The note is the anti-vacuity assertion, and it is the only one here that matters. YAML 1.1
+    # resolves an unquoted `on` to the boolean true, so an accessor reading `document["on"]` finds
+    # no triggers at all — and a rule handed no triggers passes every workflow ever written.
+    assert f"{RELEASE_YML} is triggered by release, workflow_dispatch" in flat(proc.stdout)
+
+
+def test_rule_9_allows_a_push_that_names_branches(repo: Path) -> None:
+    # Naming any branch filter is what stops tags reaching a workflow, so this one is a branch
+    # trigger and not a violation. A rule that failed every `push:` would fail `ci.yml` too.
+    publishes(repo, "on:\n  push:\n    branches: [main]\n  release:\n    types: [published]\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["release-trigger"] == "ok"
+
+
+def test_rule_9_is_vacuous_and_not_passing_when_the_repo_publishes_nothing(repo: Path) -> None:
+    # `init-repo` deletes the workflow for a repo that does not publish. Nothing was checked, and
+    # the run has to say so: a green here would read as "the trigger is safe", which is a claim
+    # this run has no evidence for.
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["release-trigger"] == "--"
+    assert f"not checked: no {RELEASE_YML}, so this repo publishes to no package index" in flat(
+        proc.stdout
+    )
+
+
+def test_warning_10_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> None:
     write(
         repo,
         "AGENTS.md",
@@ -414,7 +501,7 @@ def test_warning_9_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> Non
     assert "AGENTS.md still carries the `/init` sentinel" in flat(proc.stdout)
 
 
-def test_warning_9_is_silent_while_the_init_skill_is_the_nag(repo: Path) -> None:
+def test_warning_10_is_silent_while_the_init_skill_is_the_nag(repo: Path) -> None:
     write(
         repo,
         "AGENTS.md",
@@ -435,7 +522,7 @@ def test_a_waiver_suppresses_its_rule_and_is_still_printed(repo: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert statuses(proc)["glossary-entry-length"] == "waived"
     assert f"1 problem(s) suppressed: {reason}" in flat(proc.stdout)
-    # and warning 11 prints it a second time, in the waiver table
+    # and warning 12 prints it a second time, in the waiver table
     assert f"glossary-entry-length: 1 problem(s) suppressed — {reason}" in flat(proc.stdout)
 
 
@@ -468,7 +555,7 @@ def test_every_failure_is_reported_and_not_just_the_first(repo: Path) -> None:
     assert verdicts["agent-docs-unpublished"] == "FAIL"
     assert verdicts["skill-file-location"] == "FAIL"
     assert verdicts["repo-shape"] == "FAIL"
-    assert "3 of 9 rules failed" in proc.stderr
+    assert "3 of 10 rules failed" in proc.stderr
 
 
 def test_rule_10_fires_on_a_pre_commit_configuration(repo: Path) -> None:
