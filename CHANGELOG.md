@@ -43,8 +43,10 @@ sets one.
   `init-repo` deletes them, takes `-f mkdocs.template.yml` off the two docs tasks, and cuts
   the front page's pointer at the page.
 - Docstring examples as tests. `pytest` collects the doctests in `src/` alongside `tests/`,
-  so an example that has drifted from the code it documents fails the gate. `docs/api.md`
-  says how to mark a line that cannot run offline.
+  so an example that has drifted from the code it documents fails the gate. Writing an
+  example is voluntary; the ones that exist are checked. `docs/api.md` says how to mark a
+  line that cannot run offline. Collecting `src/` imports it, so a module that needs an
+  absent optional dependency costs one error instead of aborting the whole suite.
 - A `validation:` block in `mkdocs.yml` turning on the five link checks the site builder
   ships switched off, and a comment beside it listing, from measurement, which broken links
   a strict build catches and which three it lets through. A `nav:` entry naming a file that
@@ -53,7 +55,9 @@ sets one.
   that a parameter is annotated at all — the bar was kept by discipline and nothing would
   have noticed a repo dropping it. Its sibling `reportUnknownParameterType` was considered
   and declined: it also fails parameters that *are* annotated when the type belongs to an
-  untyped dependency, which is not a bar a lab repo can hold.
+  untyped dependency, which is not a bar a lab repo can hold. `tests/` is scoped back to
+  plain `standard`, because the rule fired on fixtures and `parametrize` arguments, where
+  the annotation it asks for is a claim nothing compares to the fixture.
 - A conformance rule that fails a `nav:` entry naming a file the repo does not track, or one
   that sits outside the site source. That is the broken site the builder does not validate
   at all — it reports no issues, exits 0, and publishes a menu item that 404s — so the check

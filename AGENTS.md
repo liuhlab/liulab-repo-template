@@ -51,7 +51,7 @@ CONTEXT.md        the glossary — the words this repo uses
 | Step | Tool |
 | --- | --- |
 | `lint`, `fmt-check` | ruff |
-| `typecheck` | pyright, `standard` mode, plus annotated parameters |
+| `typecheck` | pyright, `standard` mode, plus annotated parameters outside `tests/` |
 | `vale`, `markdownlint` | the writing rules |
 | `conformance` | the repo still matches the template's rules |
 | `test` | pytest |
