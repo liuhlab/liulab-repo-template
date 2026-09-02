@@ -34,6 +34,12 @@ why the identity keys ship carrying the placeholder rather than a real URL; `ini
 fills them from the git remote. Writing the real identity in looks like a fix and quietly
 removes the only check that a derived repo's published site points at itself.
 
+A derived repo will bring you findings. Some are gifts — a defect this repo is too young to
+exercise. Some are a downstream need in general clothing, and correctness will not separate
+them; who pays will. A rule lands in every repo made from here, including ones that never
+have the problem. `AGENTS.md` carries the rest of that test, and it binds hardest on a rule
+someone else is asking for.
+
 `AGENTS.md` is generic on purpose too. It ships with a sentinel line telling the reader to
 run `/init`, and `init-repo` leaves it alone. Nothing in it points at this skill, which is
 the whole reason this guidance is a skill and not a `CONTRIBUTING.md`: a skill is

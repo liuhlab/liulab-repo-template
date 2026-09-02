@@ -64,6 +64,9 @@ pyyaml = "*"
 
 [tool.pixi.feature.test.dependencies]
 pytest = "*"
+# Declared here too, not inherited: the tests run conformance, and a test environment shaped
+# differently from this one would import-error on every test.
+pyyaml = "*"
 
 # Exact: at 0.0.x nothing promises the next patch is compatible.
 [tool.pixi.feature.docs.dependencies]
@@ -153,12 +156,19 @@ venv = "default"
 # No `pythonVersion`: taken from the interpreter in the environment above.
 typeCheckingMode = "standard"
 # Not redundant: `standard` does not check that a parameter is annotated at all. `Any`
-# satisfies it, so the fix is always in the file you are editing.
+# satisfies it, so the fix is always in the file you are editing. Scoped off `tests/` below.
 reportMissingParameterType = "error"
 # Deliberately NOT `reportUnknownParameterType`: it also fails annotated parameters and
 # inferred return types whose types an untyped dependency owns. Not a bar a lab repo can meet.
 useLibraryCodeForTypes = true
 reportMissingTypeStubs = "none"
+
+# `tests/` back to plain `standard`. A fixture's type is pytest's, not the author's, and a
+# test signature promises a caller nothing: the rule fired four times on twenty lines of
+# correct test code and caught nothing (#65). `src` keeps it. Do not delete this block.
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+reportMissingParameterType = "none"
 
 # ============================== pytest ==============================
 
@@ -166,7 +176,17 @@ reportMissingTypeStubs = "none"
 # `src` is collected for its docstring examples alone: `--doctest-modules` runs them, so an
 # example that has drifted from the code it documents fails.
 testpaths = ["tests", "src"]
-addopts = ["-ra", "--strict-markers", "--strict-config", "--doctest-modules"]
+# `--continue-on-collection-errors` because collecting `src` IMPORTS every module in it. A
+# module needing an absent optional dependency — a plotting path, a CUDA path, a
+# platform-specific binding — used to abort collection and run zero tests. It now costs one
+# error. Measured: the run still exits non-zero, and a drifted example still fails (#66).
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--doctest-modules",
+    "--continue-on-collection-errors",
+]
 xfail_strict = true
 filterwarnings = ["error"]
 

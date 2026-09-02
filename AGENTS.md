@@ -6,6 +6,23 @@
 One paragraph: what this package is for, who uses it, and the one thing that is easy to get
 wrong. Distribution name **`liulab-newpkg`**, import name **`newpkg`**.
 
+## Restraint
+
+Generalizable, lightweight, uncustomized — in that order, and ahead of thorough.
+
+Every gate, lint rule, cap and check is paid by everyone who works here afterwards. They
+arrive one at a time, each reasonable alone, and nothing measures the sum. So before adding
+one:
+
+- **Does it generalize?** A rule shaped by one situation belongs where that situation is.
+  Evidence that it helps there is not evidence about here.
+- **What is the total?** Count what someone must already satisfy before writing any code.
+- **Would a narrower rule do?** Prefer narrowing to forbidding a legitimate practice.
+
+**A measurement outranks a hypothesis.** When a rule is shown to fire on correct work, that
+is evidence; a defect it might also catch is not. Declining a rule, or removing one that
+misfires, is as much a contribution as adding one.
+
 ## Toolchain
 
 - **pixi** is the only supported toolchain. Never bare pip, uv, or conda. `pyproject.toml`
@@ -34,7 +51,7 @@ CONTEXT.md        the glossary — the words this repo uses
 | Step | Tool |
 | --- | --- |
 | `lint`, `fmt-check` | ruff |
-| `typecheck` | pyright, `standard` mode, plus annotated parameters |
+| `typecheck` | pyright, `standard` mode, plus annotated parameters outside `tests/` |
 | `vale`, `markdownlint` | the writing rules |
 | `conformance` | the repo still matches the template's rules |
 | `test` | pytest |

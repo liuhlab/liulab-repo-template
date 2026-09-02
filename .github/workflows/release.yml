@@ -14,13 +14,13 @@
 name: release
 
 on:
-  # NEVER a trigger that a tag push can fire — `push: tags:`, a `push:` with no branch
-  # filter, or `create`. `init-repo` pushes `v0.0.0` on a repo's first day so the version
-  # does not read as if a release already happened, and any of those would fire a PyPI
-  # publish right then, from a repo nobody has finished naming. Publishing a GitHub Release
-  # is a deliberate act by a person, so that is the trigger. This paragraph is the advice
-  # and conformance rule `release-trigger` is the enforcement; they say one thing, so they
-  # change together.
+  # NEVER a trigger that pushing `v0.0.0` can fire — a `push:` with no branch filter,
+  # `create`, or a `tags:` filter that admits it. `init-repo` pushes `v0.0.0` on a repo's
+  # first day so the version does not read as if a release already happened, and any of
+  # those would fire a PyPI publish right then, from a repo nobody has finished naming.
+  # Publishing a GitHub Release is a deliberate act by a person, so that is the trigger.
+  # This paragraph is the advice and conformance rule `release-trigger` is the enforcement;
+  # they say one thing, so they change together.
   release:
     types: [published]
   # For a release whose publish failed on something outside the code — a missing trusted
