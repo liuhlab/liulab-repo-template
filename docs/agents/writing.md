@@ -34,6 +34,13 @@ document ran long; that is the cap working.
 (`Lab.Jargon` — architecture-speak and Latinate verbs), and reading grade 11 or below
 (`Lab.Readability`). No length cap — a tutorial is as long as the task.
 
+**When `Lab.Readability` fails, match a passing exemplar — do not attack the number.** The
+grade is a ratio over structure, so shaving words inside sentences you already committed to
+moves it by hundredths. Find text that passes — an older section, a sibling page — and rewrite
+toward how it is segmented. Measured on a 21,000-word changelog: optimising the grade directly
+moved it 12.46 to 12.41; matching a passing section in the same file moved it under 11, while
+cutting only 3% of the words and *raising* the entry count.
+
 **This rule also covers what you say, not only what you write.** Nothing checks a chat
 reply, so it is on you: when a human asks, answer in plain language and explain the term
 you would otherwise reach for. An unexplained term in conversation is the same failure as
