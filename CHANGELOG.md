@@ -11,7 +11,9 @@ sets one.
 
 - The placeholder package, the pixi workspace, and the three environments.
 - `scripts/check.sh`, the gate runner behind `pixi run check`: it runs every static step
-  concurrently and reports all failures, not just the first.
+  concurrently and reports all failures, not just the first. A step that passes is shown
+  as a short tail and one that fails in full, the summary says how long each step took,
+  and a run stopped with Ctrl-C takes its steps down with it.
 - The writing gate: `vale` and `markdownlint` as steps of `check-static`, with the four
   `Lab` rules tracked in `styles/Lab/`.
 - The three workflows: `ci.yml` runs the gate on every pull request, `docs.yml` publishes
