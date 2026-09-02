@@ -5,7 +5,7 @@
     python scripts/conformance.py [--root PATH]
 
 It states the RULE, not the file contents — a pull model, so a repo that legitimately diverges
-stays green while the shared conventions stay checked. Twelve rules: ten fail, two only warn.
+stays green while the shared conventions stay checked. Thirteen rules: eleven fail, two only warn.
 
 Three things it does on purpose:
 
@@ -499,8 +499,68 @@ def _has_table(manifest: dict[str, Any], dotted: str) -> bool:
     return True
 
 
+#: A `major.minor` anywhere in a version a tool spells out — `3.13`, `3.13.*`, `>=3.13,<3.14`.
+_MINOR_RE = re.compile(r"(?P<major>\d+)\.(?P<minor>\d+)")
+#: The lowest version a `requires-python` specifier admits. `<` and `!=` name no floor at all.
+_FLOOR_RE = re.compile(r"(?:>=|~=|==)\s*(?P<major>\d+)\.(?P<minor>\d+)")
+#: Ruff's spelling: one digit of major, the rest minor, so `py313` is 3.13 and `py39` is 3.9.
+_RUFF_TARGET_RE = re.compile(r"^py(?P<major>\d)(?P<minor>\d+)$")
+
+#: Where a repo writes a LANGUAGE LEVEL down, beyond the floor and the pin: the table, the key,
+#: the pattern that reads it, and how that tool spells a level back. A repo that adds a tool adds
+#: one line here. Trove classifiers are deliberately absent — `Programming Language :: Python ::
+#: 3.12` is a list of versions a package supports, not a level, and a library names several.
+_LEVEL_SITES: tuple[tuple[tuple[str, ...], str, re.Pattern[str], str], ...] = (
+    (("tool", "ruff"), "target-version", _RUFF_TARGET_RE, "py{0}{1}"),
+    (("tool", "pyright"), "pythonVersion", _MINOR_RE, "{0}.{1}"),
+    (("tool", "mypy"), "python_version", _MINOR_RE, "{0}.{1}"),
+)
+
+
+def _table(root: dict[str, Any], *path: str) -> dict[str, Any]:
+    """One nested table of a parsed TOML file, or an empty mapping where the path runs out."""
+    node: Any = root
+    for key in path:
+        node = node.get(key) if isinstance(node, dict) else None
+    return node if isinstance(node, dict) else {}
+
+
+def _version(text: str, pattern: re.Pattern[str]) -> tuple[int, int] | None:
+    """Read the (major, minor) a pattern finds in one declaration.
+
+    ``None`` when the pattern finds none, which is a declaration nothing can be held to.
+    """
+    match = pattern.search(text.strip())
+    return (int(match["major"]), int(match["minor"])) if match else None
+
+
+def _spell(level: tuple[int, int]) -> str:
+    """Write a (major, minor) the way a person says it."""
+    return f"{level[0]}.{level[1]}"
+
+
+def _python_pins(pyproject: dict[str, Any]) -> dict[str, str]:
+    """Every pixi `python` pin, keyed by the table header that holds it.
+
+    Features are read as well as the default table, because a repo that really supports a range
+    gives its floor an environment to resolve in, and rule 10 says so in its notes. A pin may be
+    written `python = "3.13.*"` or `python = { version = "3.13.*" }`; both are the same claim.
+    """
+    tables: set[tuple[str, ...]] = {("tool", "pixi", "dependencies")}
+    for name in _table(pyproject, "tool", "pixi", "feature"):
+        tables.add(("tool", "pixi", "feature", name, "dependencies"))
+    pins: dict[str, str] = {}
+    for path in sorted(tables):
+        value: Any = _table(pyproject, *path).get("python")
+        if isinstance(value, dict):
+            value = value.get("version")
+        if isinstance(value, str):
+            pins[f"[{'.'.join(path)}] python"] = value
+    return pins
+
+
 # --------------------------------------------------------------------------------------
-# The rules. Ten fail, two warn. Each returns what it found; nothing here exits or prints.
+# The rules. Eleven fail, two warn. Each returns what it found; nothing here exits or prints.
 # --------------------------------------------------------------------------------------
 
 
@@ -849,7 +909,7 @@ def rule_release_trigger(repo: Repo) -> Result:
 
 
 def warning_init_sentinel(repo: Repo) -> Result:
-    """10. `AGENTS.md` still carries the line telling you to run `/init`."""
+    """12. `AGENTS.md` still carries the line telling you to run `/init`."""
     result = Result()
     if repo.exists(INIT_SKILL):
         result.notes.append(f"not checked: {INIT_SKILL}/ is here, and that skill is the nag")
@@ -916,6 +976,105 @@ def rule_single_toolchain(repo: Repo) -> Result:
         f"{len(SECOND_TOOLCHAINS)} second toolchain(s) looked for across "
         f"{len(repo.tracked)} tracked path(s) and pyproject.toml: {names}"
     )
+    return result
+
+
+def rule_python_version_agreement(repo: Repo) -> Result:
+    """11. Every declared Python version agrees with the floor and with the pinned interpreter."""
+    result = Result()
+    # AGREEMENT, never a count. A repo supporting a range of Pythons declares a floor below its
+    # pin and holds its tools to the floor, and a rule that counted declarations would fail it —
+    # which would make this template unusable for a library. What cannot legitimately differ is
+    # what the declarations SAY.
+    pins = _python_pins(repo.manifest)
+    pinned: dict[str, tuple[int, int]] = {}
+    for where, spelling in pins.items():
+        level = _version(spelling, _MINOR_RE)
+        if level is not None:
+            pinned[where] = level
+    if not pinned:
+        if pins:
+            spelled = ", ".join(f"{where} is `{pins[where]}`" for where in sorted(pins))
+            reason = f"no pixi `python` pin names a minor version: {spelled}"
+        else:
+            reason = "no `python` in [tool.pixi.dependencies] or in any pixi feature"
+        result.notes.append(
+            f"not checked: {reason} — this repo names no interpreter for the other declarations "
+            "to agree with"
+        )
+        return result
+
+    requires = _table(repo.manifest, "project").get("requires-python")
+    requires = requires if isinstance(requires, str) else None
+    floor = _version(requires, _FLOOR_RE) if requires is not None else None
+    lowest = min(pinned.values())
+    for where, level in sorted(pinned.items()):
+        if floor is not None and level < floor:
+            result.problems.append(
+                _problem(
+                    f"{where} `{pins[where]}` pins {_spell(level)}, below the "
+                    f"[project] requires-python floor `{requires}`",
+                    "the repo runs an interpreter its own package metadata says it does not "
+                    "support, so every gate is green on a version pip would refuse to install on",
+                    f"raise the pin to {_spell(floor)}, or lower requires-python to "
+                    f">={_spell(level)}",
+                )
+            )
+
+    # The language level a tool holds the code to is the OLDEST interpreter the repo supports:
+    # the floor where one is declared, and otherwise the lowest thing pinned.
+    if floor is not None:
+        wanted, source = floor, f"[project] requires-python `{requires}`"
+    else:
+        wanted = lowest
+        at_lowest = next(where for where, level in sorted(pinned.items()) if level == lowest)
+        source = f"{at_lowest} `{pins[at_lowest]}`"
+    declared = [f"[project] requires-python `{requires}`"] if requires is not None else []
+    declared += [f"{where} `{pins[where]}`" for where in sorted(pinned)]
+    for path, key, pattern, spelling in _LEVEL_SITES:
+        table = _table(repo.manifest, *path)
+        if key not in table:
+            continue
+        where = f"[{'.'.join(path)}] {key}"
+        said = str(table[key])
+        declared.append(f"{where} `{said}`")
+        level = _version(said, pattern)
+        if level is None:
+            result.problems.append(
+                _problem(
+                    f"{where} is `{said}`, which names no Python version",
+                    "a level this check cannot read is a level nothing can hold to the floor, and "
+                    f"{path[-1]} may well be reading it as something else again",
+                    f"write it the way {path[-1]} spells a version, or delete the key",
+                )
+            )
+            continue
+        if level != wanted:
+            result.problems.append(
+                _problem(
+                    f"{where} `{said}` says {_spell(level)}, and {source} says {_spell(wanted)}",
+                    "this is the language level the tool holds the code to, and it has to be the "
+                    "oldest interpreter the repo supports. Above the floor it lets through syntax "
+                    "that fails on a version the package claims to install on; below it the tool "
+                    "rejects code the repo is allowed to write",
+                    f'write `{key} = "{spelling.format(*wanted)}"`, or delete the key — with no '
+                    f"{key} the level is derived from the floor and the pin",
+                )
+            )
+
+    result.notes.append(f"{len(declared)} declaration(s): {'; '.join(declared)}")
+    # The one thing this rule CANNOT see. A floor below every pin is either a range the repo
+    # deliberately supports or a floor nobody lowered when the pin moved up, and the declarations
+    # read identically in both cases. Saying so is the point: a rule that quietly cannot tell them
+    # apart is worse than one that reports which it checked.
+    if floor is not None and floor < lowest:
+        result.notes.append(
+            f"not checked: whether {_spell(floor)} is ever resolved or tested. Nothing here pins "
+            f"it, so a range this repo supports on purpose and a floor left behind by a raised "
+            f"pin look the same — pin {_spell(floor)} in a pixi feature to make the claim real"
+        )
+    elif floor is not None and len(set(pinned.values())) > 1:
+        result.notes.append(f"the floor {_spell(floor)} is itself pinned, so pixi resolves it")
     return result
 
 
@@ -999,6 +1158,13 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         11,
+        "python-version-agreement",
+        "every pixi python pin satisfies the requires-python floor, and every tool that writes a "
+        "language level down writes the floor — agreement, not a count, so a range still passes",
+        rule_python_version_agreement,
+    ),
+    Rule(
+        12,
         "init-sentinel",
         "AGENTS.md is still the template's generic copy",
         warning_init_sentinel,
@@ -1006,9 +1172,9 @@ RULES: tuple[Rule, ...] = (
     ),
 )
 
-#: Warning 12 is not a rule with a tree to inspect: it is the waiver table itself, printed on
+#: Warning 13 is not a rule with a tree to inspect: it is the waiver table itself, printed on
 #: every run. It lives in `report` because only the reporter knows what each waiver suppressed.
-WAIVER_RULE = (12, "waivers")
+WAIVER_RULE = (13, "waivers")
 
 
 def load(root: Path) -> Repo:
@@ -1059,7 +1225,7 @@ def _verdict(repo: Repo, rule: Rule, result: Result) -> tuple[str, list[str]]:
 
 
 def _waiver_lines(repo: Repo, results: list[tuple[Rule, Result]]) -> list[str]:
-    """Warning 12: every waiver, with what it actually suppressed.
+    """Warning 13: every waiver, with what it actually suppressed.
 
     A waiver naming no rule is called out rather than ignored, and so is one naming rule 1, which
     refuses to be waived. A waiver that quietly does nothing is the same invisible escape hatch
@@ -1109,6 +1275,9 @@ def report(repo: Repo, results: list[tuple[Rule, Result]]) -> int:
                     width=110,
                     initial_indent=head if index == 0 else " " * len(head),
                     subsequent_indent=" " * len(head),
+                    # Notes are mostly identifiers — `target-version`, `agent-docs`, a path — and
+                    # a wrap inside one leaves a name no reader can grep for.
+                    break_on_hyphens=False,
                 )
             )
 

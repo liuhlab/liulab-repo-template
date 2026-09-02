@@ -7,7 +7,7 @@ checked by no rule at all, with zero alerts and green CI. So the claim these tes
 
 Every test builds a tmp_path tree that is correct in every respect but one, and asserts the run
 marks THAT rule FAIL and names the offending file. The rule name alone would prove nothing: the
-status table prints all twelve names on every run, passing or failing, so the assertions read the
+status table prints all thirteen names on every run, passing or failing, so the assertions read the
 status word out of the table rather than grepping the output for a name.
 
 Conformance is invoked as a SUBPROCESS, so what is under test is the command an agent runs and
@@ -183,7 +183,7 @@ def statuses(proc: subprocess.CompletedProcess[str]) -> dict[str, str]:
     """The verdict the run gave each rule, read off its own status table.
 
     Asserting on the status word rather than on the presence of a rule NAME is the point: the
-    table prints all twelve names on every run, so `"repo-shape" in output` is true of a green run
+    table prints all thirteen names on every run, so `"repo-shape" in output` is true of a green run
     and would prove nothing at all.
     """
     found: dict[str, str] = {}
@@ -215,6 +215,7 @@ def test_the_fixture_tree_passes_every_rule(repo: Path) -> None:
         "release-trigger",
         "init-sentinel",
         "single-toolchain",
+        "python-version-agreement",
         "waivers",
     }
     assert verdicts["placeholder-rename"] == "ok"  # live, not gated off
@@ -555,7 +556,7 @@ def test_every_failure_is_reported_and_not_just_the_first(repo: Path) -> None:
     assert verdicts["agent-docs-unpublished"] == "FAIL"
     assert verdicts["skill-file-location"] == "FAIL"
     assert verdicts["repo-shape"] == "FAIL"
-    assert "3 of 10 rules failed" in proc.stderr
+    assert "3 of 11 rules failed" in proc.stderr
 
 
 def test_rule_10_fires_on_a_pre_commit_configuration(repo: Path) -> None:
@@ -622,3 +623,145 @@ def test_rule_10_says_which_second_toolchains_it_looked_for(repo: Path) -> None:
     assert statuses(proc)["single-toolchain"] == "ok"
     assert "8 second toolchain(s) looked for" in flat(proc.stdout)
     assert "pre-commit, pip, conda, pipenv, setuptools, poetry, uv, pdm" in flat(proc.stdout)
+
+
+def pyproject_python(
+    *,
+    floor: str | None = None,
+    pin: str | None = None,
+    feature_pin: str | None = None,
+    ruff: str | None = None,
+    pyright: str | None = None,
+) -> str:
+    """The fixture's pyproject plus whichever Python declarations one test wants.
+
+    A builder rather than five literals because rule 10 is about the COMBINATION: every test
+    below differs only in which sites it fills in and what each of them says.
+    """
+    text = PYPROJECT
+    if floor is not None:
+        text = text.replace('name = "example"', f'name = "example"\nrequires-python = "{floor}"')
+    if pin is not None:
+        text += f'\n[tool.pixi.dependencies]\npython = "{pin}"\n'
+    if feature_pin is not None:
+        text += f'\n[tool.pixi.feature.floor.dependencies]\npython = "{feature_pin}"\n'
+    if ruff is not None:
+        text += f'\n[tool.ruff]\ntarget-version = "{ruff}"\n'
+    if pyright is not None:
+        text += f'\n[tool.pyright]\npythonVersion = "{pyright}"\n'
+    return text
+
+
+def test_rule_11_is_vacuous_when_the_repo_pins_no_interpreter(repo: Path) -> None:
+    # The fixture declares no Python at all. With no pinned interpreter there is nothing for the
+    # other declarations to agree WITH, so the run has to say it checked nothing.
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["python-version-agreement"] == "--"
+    assert "not checked: no `python` in [tool.pixi.dependencies] or in any pixi feature" in flat(
+        proc.stdout
+    )
+
+
+def test_rule_11_passes_on_a_floor_and_a_pin_that_agree(repo: Path) -> None:
+    # Two declarations, which is what the template ships: ruff takes its target from the floor
+    # and pyright takes its version from the interpreter, so neither writes a level down.
+    write(repo, "pyproject.toml", pyproject_python(floor=">=3.13", pin="3.13.*"))
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["python-version-agreement"] == "ok"
+    assert "2 declaration(s)" in flat(proc.stdout)
+
+
+def test_rule_11_passes_when_four_declarations_agree(repo: Path) -> None:
+    # Writing the derived levels down is allowed; disagreeing with the floor is not. A rule that
+    # counted declarations would fail this tree, and this tree is fine.
+    write(
+        repo,
+        "pyproject.toml",
+        pyproject_python(floor=">=3.13", pin="3.13.*", ruff="py313", pyright="3.13"),
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["python-version-agreement"] == "ok"
+    assert "4 declaration(s)" in flat(proc.stdout)
+
+
+def test_rule_11_fires_when_a_tool_holds_a_level_the_floor_does_not(repo: Path) -> None:
+    write(
+        repo,
+        "pyproject.toml",
+        pyproject_python(floor=">=3.13", pin="3.13.*", ruff="py312", pyright="3.13"),
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["python-version-agreement"] == "FAIL"
+    assert (
+        "[tool.ruff] target-version `py312` says 3.12, and [project] requires-python `>=3.13` "
+        "says 3.13" in proc.stderr
+    )
+    # Named the site, what it says, and what it should say instead.
+    assert 'write `target-version = "py313"`' in flat(proc.stderr)
+
+
+def test_rule_11_fires_on_a_pin_below_the_floor(repo: Path) -> None:
+    # The other direction: the repo runs an interpreter its own metadata refuses to install on.
+    write(repo, "pyproject.toml", pyproject_python(floor=">=3.13", pin="3.12.*"))
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["python-version-agreement"] == "FAIL"
+    assert (
+        "[tool.pixi.dependencies] python `3.12.*` pins 3.12, below the [project] requires-python "
+        "floor `>=3.13`" in proc.stderr
+    )
+
+
+def test_rule_11_measures_a_tool_against_the_pin_when_there_is_no_floor(repo: Path) -> None:
+    write(repo, "pyproject.toml", pyproject_python(pin="3.13.*", ruff="py312"))
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["python-version-agreement"] == "FAIL"
+    assert "[tool.pixi.dependencies] python `3.13.*` says 3.13" in proc.stderr
+
+
+def test_rule_11_passes_a_range_that_pixi_actually_resolves(repo: Path) -> None:
+    # The case the rule exists to leave alone: a repo supporting 3.10 through 3.13 on purpose. The
+    # floor is below the default pin, the tools are held to the floor, and a feature gives 3.10 an
+    # environment — so the range is a claim pixi resolves rather than one nothing exercises.
+    write(
+        repo,
+        "pyproject.toml",
+        pyproject_python(
+            floor=">=3.10", pin="3.13.*", feature_pin="3.10.*", ruff="py310", pyright="3.10"
+        ),
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["python-version-agreement"] == "ok"
+    assert "the floor 3.10 is itself pinned, so pixi resolves it" in flat(proc.stdout)
+
+
+def test_rule_11_says_it_cannot_tell_a_range_from_a_floor_nobody_lowered(repo: Path) -> None:
+    # Copied from a real Liu Lab repo, which carried exactly this: a >=3.12 floor, a 3.13 pin,
+    # ruff and pyright at 3.12, and a lockfile holding only 3.13. The declarations AGREE — the
+    # tools are at the floor, which is what a deliberate range looks like — so the rule does not
+    # fail it. What it must not do is call that a clean pass in silence: nothing pins 3.12, so the
+    # promise of 3.12 support is exercised by nothing, and the notes say so on every run.
+    write(
+        repo,
+        "pyproject.toml",
+        pyproject_python(floor=">=3.12", pin="3.13.*", ruff="py312", pyright="3.12"),
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["python-version-agreement"] == "ok"
+    printed = flat(proc.stdout)
+    # Every site and what each one says, so the split is readable at a glance.
+    for said in (
+        "[project] requires-python `>=3.12`",
+        "[tool.pixi.dependencies] python `3.13.*`",
+        "[tool.ruff] target-version `py312`",
+        "[tool.pyright] pythonVersion `3.12`",
+    ):
+        assert said in printed
+    assert "not checked: whether 3.12 is ever resolved or tested" in printed

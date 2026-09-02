@@ -26,6 +26,10 @@ sets one.
 - A conformance rule that fails a publishing workflow a tag push can trigger, and the
   workflow reader it is built on: the check now parses every workflow file, its triggers
   and its steps, instead of only reading text.
+- A conformance rule for the Python version. The pixi pin has to meet the
+  `requires-python` floor, and any tool that writes a language level down has to write that
+  floor. It checks that the declarations agree, and does not count them, so a repo that
+  supports a range of Python versions still passes.
 - `docs/template/index.md`, the page that says what the template ships and how to make a
   repo from it, and `mkdocs.template.yml`, which inherits `mkdocs.yml` and names the site
   after this repo while the shipped config keeps the placeholder. Both are template-only:
