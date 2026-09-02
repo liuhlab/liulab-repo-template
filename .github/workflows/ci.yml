@@ -7,7 +7,9 @@
 #
 # Every step invokes `pixi run <task>` and never a command line. The step list lives in
 # `pyproject.toml` — `check-static` names it once — so this file and a laptop cannot drift:
-# adding a step is one more word there and nothing here.
+# adding a step is one more word there and nothing here. This paragraph is the advice and
+# conformance rule `workflow-step-tasks` is the enforcement, over every workflow in the
+# repo and not only this one; they say one thing, so they change together.
 #
 # Not shipped, deliberately: a `claude.yml`, because on a public repo anyone who can
 # comment could spend the API budget; container and benchmark workflows, because nothing

@@ -5,7 +5,7 @@
     python scripts/conformance.py [--root PATH]
 
 It states the RULE, not the file contents — a pull model, so a repo that legitimately diverges
-stays green while the shared conventions stay checked. Twelve rules: ten fail, two only warn.
+stays green while the shared conventions stay checked. Thirteen rules: eleven fail, two only warn.
 
 Three things it does on purpose:
 
@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import posixpath
 import re
+import shlex
 import subprocess
 import sys
 import textwrap
@@ -55,7 +56,7 @@ import yaml
 #: neither happens.
 PLACEHOLDER = "new" + "pkg"
 
-#: Rule 1 and warning 11 are both gated on this directory, and it is the only discriminator either
+#: Rule 1 and warning 12 are both gated on this directory, and it is the only discriminator either
 #: needs. While it is here, `init-repo` has not run: the placeholder is still the repo's own name,
 #: and the auto-discovered skill is itself the nag. Once it is gone the repo claims to be its own,
 #: and both rules start checking.
@@ -83,6 +84,36 @@ RELEASE_WORKFLOW = f"{WORKFLOW_DIR}release.yml"
 #: Vale's spelling of on and off. Both forms appear in the wild; the gate accepts either.
 VALE_ON = {"YES", "TRUE", "ON"}
 VALE_OFF = {"NO", "FALSE", "OFF"}
+
+#: The command a workflow step is allowed to run, and the table its task must be declared in.
+#: Both are named here because rule 11's problem text and its fix both spell them.
+PIXI_RUN = "pixi run"
+TASK_TABLE = "[tool.pixi.tasks]"
+
+#: The `pixi run` options that take a SEPARATE value, so the token after one is that value and
+#: never the task name. The `--option=value` form needs no entry, being one token. Anything else
+#: beginning with `-` is read as a switch, so an option pixi grows later would be mistaken for the
+#: task and reported LOUDLY — the safe direction of error for a check whose whole job is to notice
+#: drift nobody announced.
+PIXI_VALUE_OPTIONS = frozenset(
+    {
+        "-e",
+        "--environment",
+        "--manifest-path",
+        "--color",
+        "--auth-file",
+        "--pypi-keyring-provider",
+        "--concurrent-solves",
+        "--concurrent-downloads",
+    }
+)
+
+#: What a `${{ ... }}` expression is replaced by before a step's command is split into tokens.
+#: GitHub substitutes these when the job runs, and `shlex` would split one into three tokens and
+#: read the middle as the task name. The stand-in is not a legal task name, so a step that names
+#: its task with an expression is reported as unresolved rather than failed.
+EXPRESSION = "${{}}"
+_EXPRESSION_RE = re.compile(r"\$\{\{.*?\}\}", re.DOTALL)
 
 _SECTION_RE = re.compile(r"^\[(?P<header>.+)\]\s*$")
 _SETTING_RE = re.compile(r"^(?P<key>[A-Za-z][^=]*?)\s*=\s*(?P<value>.*?)\s*$")
@@ -360,6 +391,17 @@ class Repo:
         return tomllib.loads(self.read("pyproject.toml") or "")
 
     @cached_property
+    def tasks(self) -> frozenset[str]:
+        """Every pixi task name the manifest declares, wherever under `[tool.pixi]` it is written.
+
+        Walked rather than read out of `[tool.pixi.tasks]` alone. pixi lets a task be declared on
+        the workspace, on a FEATURE, or on a platform target, and this repo's own `docs-build`
+        lives on the `docs` feature — so a rule reading one table would fail the docs job of a
+        workflow that is entirely correct.
+        """
+        return frozenset(_task_names(self.manifest.get("tool", {}).get("pixi")))
+
+    @cached_property
     def workflows(self) -> tuple[Workflow, ...]:
         """Every tracked workflow definition, parsed, in path order.
 
@@ -410,6 +452,58 @@ def _walk_strings(node: Any) -> Iterator[str]:
     elif isinstance(node, dict):
         for value in node.values():  # pyright: ignore[reportUnknownVariableType]
             yield from _walk_strings(value)
+
+
+def _task_names(node: Any) -> Iterator[str]:
+    """Every key of every `tasks` table at any depth, wherever pixi accepts one.
+
+    One walk rather than four reads: a task may be declared on the workspace, on a feature, on a
+    platform target, or on a target under a feature.
+    """
+    if not isinstance(node, dict):
+        return
+    for key, value in node.items():  # pyright: ignore[reportUnknownVariableType]
+        if key == "tasks" and isinstance(value, dict):
+            yield from (str(name) for name in value)  # pyright: ignore[reportUnknownVariableType]
+        else:
+            yield from _task_names(value)
+
+
+def _invoked_task(run: str) -> str | None:
+    """Read the pixi task one step's `run:` script invokes, or ``None`` when it runs a command.
+
+    The accepted shape is `pixi run`, any pixi options, and one more token — the task. Options are
+    skipped on both sides of `run`, so `pixi run -e test test` and `pixi run docs-build` arrive
+    the same way and no spelling is privileged.
+
+    Nothing may follow the task, and that is the strict half of the rule rather than an oversight.
+    A step passing arguments of its own is the drift this rule is about, one level down: the
+    arguments a task runs with belong in the task, which is exactly where `check-static` keeps its
+    own list. A script of several lines, or two commands joined by `&&`, leaves tokens after the
+    task and lands here too.
+    """
+    script = _EXPRESSION_RE.sub(EXPRESSION, run)
+    try:
+        tokens = shlex.split(script, comments=True)
+    except ValueError:
+        # An unbalanced quote. Not a crash and not a pass: whatever it is, it is not this shape.
+        return None
+    if not tokens or tokens[0] != "pixi":
+        return None
+    index = _skip_options(tokens, 1)
+    if index >= len(tokens) or tokens[index] != "run":
+        return None
+    index = _skip_options(tokens, index + 1)
+    if len(tokens) - index != 1:
+        return None
+    return tokens[index]
+
+
+def _skip_options(tokens: list[str], index: int) -> int:
+    """Advance past the options at `index`, taking the value of one that has a separate value."""
+    while index < len(tokens) and tokens[index].startswith("-"):
+        index += 2 if tokens[index] in PIXI_VALUE_OPTIONS else 1
+    return index
 
 
 def _front_matter(text: str) -> dict[str, Any] | None:
@@ -500,7 +594,7 @@ def _has_table(manifest: dict[str, Any], dotted: str) -> bool:
 
 
 # --------------------------------------------------------------------------------------
-# The rules. Ten fail, two warn. Each returns what it found; nothing here exits or prints.
+# The rules. Eleven fail, two warn. Each returns what it found; nothing here exits or prints.
 # --------------------------------------------------------------------------------------
 
 
@@ -848,35 +942,6 @@ def rule_release_trigger(repo: Repo) -> Result:
     return result
 
 
-def warning_init_sentinel(repo: Repo) -> Result:
-    """10. `AGENTS.md` still carries the line telling you to run `/init`."""
-    result = Result()
-    if repo.exists(INIT_SKILL):
-        result.notes.append(f"not checked: {INIT_SKILL}/ is here, and that skill is the nag")
-        return result
-    text = repo.read("AGENTS.md")
-    if text is None:
-        result.notes.append("not checked: no AGENTS.md")
-        return result
-    # The sentinel is a blockquote line naming `/init`. It is phrased as an instruction and it
-    # says to delete itself, so replacing the file is what makes this warning stop — "done" needs
-    # no separate step. This WARNS and never fails: a new repo must not start red for a task its
-    # owner is allowed to defer.
-    if any(line.lstrip().startswith(">") and "/init" in line for line in text.splitlines()):
-        result.problems.append(
-            _problem(
-                "AGENTS.md still carries the `/init` sentinel",
-                "the file is the template's generic copy: it says how ANY Liu Lab repo works, "
-                "not what this one does, and an agent that reads it will act on a description "
-                "that was never true here",
-                "run `/init`, then delete the sentinel line. This is a warning, not a failure",
-            )
-        )
-    else:
-        result.notes.append("AGENTS.md no longer carries it")
-    return result
-
-
 def rule_single_toolchain(repo: Repo) -> Result:
     """10. No second toolchain is configured: pixi and the manifest are the only ones."""
     result = Result()
@@ -916,6 +981,89 @@ def rule_single_toolchain(repo: Repo) -> Result:
         f"{len(SECOND_TOOLCHAINS)} second toolchain(s) looked for across "
         f"{len(repo.tracked)} tracked path(s) and pyproject.toml: {names}"
     )
+    return result
+
+
+def rule_workflow_step_tasks(repo: Repo) -> Result:
+    """11. Every workflow step that runs anything invokes a task the manifest declares."""
+    result = Result()
+    # `uses:` steps are not examined at all, and that is the rule and not an exemption: an action
+    # is a dependency the workflow pulls in, not a step of this repo's own build, and there is no
+    # task for it to have been.
+    running = [step for w in repo.workflows for step in w.steps if step.run is not None]
+    if not running:
+        result.notes.append("not checked: no tracked workflow has a step that runs a command")
+        return result
+    unresolved = 0
+    for step in running:
+        where = f"{step.workflow} job `{step.job}` step {step.index}"
+        if step.name:
+            where += f" ({step.name})"
+        task = _invoked_task(step.run or "")
+        if task is None:
+            result.problems.append(
+                _problem(
+                    f"{where} runs a command rather than `{PIXI_RUN} <task>`",
+                    "the step list lives in the task table so that CI and a laptop run the same "
+                    "steps by construction. A step that spells out a command runs something no "
+                    "local `pixi run` does, and both stay green while they quietly stop being the "
+                    "same claim — until someone notices the two lists disagree, months later",
+                    f"declare what it runs as a task in {TASK_TABLE}, arguments included, and "
+                    f"make the step `{PIXI_RUN} <that task>`",
+                )
+            )
+        elif EXPRESSION in task:
+            unresolved += 1
+        elif task not in repo.tasks:
+            result.problems.append(
+                _problem(
+                    f"{where} invokes `{task}`, which this repo declares no task by",
+                    "a step naming a task nobody declared cannot run at all, and the workflow "
+                    "that finds out is often one that runs rarely — the publish, the scheduled "
+                    "job — so the break surfaces on the day it costs the most. It reads as if it "
+                    "were following the convention, which is what makes it worse than a command",
+                    f"declare `{task}` in pyproject.toml under {TASK_TABLE}, or point the step at "
+                    "a task that is declared",
+                )
+            )
+    result.notes.append(
+        f"{len(running)} step(s) that run a command, across {len(repo.workflows)} workflow(s), "
+        f"against {len(repo.tasks)} declared task(s)"
+    )
+    if unresolved:
+        result.notes.append(
+            f"{unresolved} step(s) name their task with a `" + EXPRESSION + "` expression, which "
+            "GitHub resolves when the job runs and this cannot"
+        )
+    return result
+
+
+def warning_init_sentinel(repo: Repo) -> Result:
+    """12. `AGENTS.md` still carries the line telling you to run `/init`."""
+    result = Result()
+    if repo.exists(INIT_SKILL):
+        result.notes.append(f"not checked: {INIT_SKILL}/ is here, and that skill is the nag")
+        return result
+    text = repo.read("AGENTS.md")
+    if text is None:
+        result.notes.append("not checked: no AGENTS.md")
+        return result
+    # The sentinel is a blockquote line naming `/init`. It is phrased as an instruction and it
+    # says to delete itself, so replacing the file is what makes this warning stop — "done" needs
+    # no separate step. This WARNS and never fails: a new repo must not start red for a task its
+    # owner is allowed to defer.
+    if any(line.lstrip().startswith(">") and "/init" in line for line in text.splitlines()):
+        result.problems.append(
+            _problem(
+                "AGENTS.md still carries the `/init` sentinel",
+                "the file is the template's generic copy: it says how ANY Liu Lab repo works, "
+                "not what this one does, and an agent that reads it will act on a description "
+                "that was never true here",
+                "run `/init`, then delete the sentinel line. This is a warning, not a failure",
+            )
+        )
+    else:
+        result.notes.append("AGENTS.md no longer carries it")
     return result
 
 
@@ -999,6 +1147,14 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         11,
+        "workflow-step-tasks",
+        f"every workflow step that runs a command invokes a declared task — `{PIXI_RUN} <task>` "
+        f"and nothing else, with the task in {TASK_TABLE}, so the step list cannot drift from the "
+        "one a laptop runs. A step that `uses:` an action is not a step of this repo's build",
+        rule_workflow_step_tasks,
+    ),
+    Rule(
+        12,
         "init-sentinel",
         "AGENTS.md is still the template's generic copy",
         warning_init_sentinel,
@@ -1006,9 +1162,9 @@ RULES: tuple[Rule, ...] = (
     ),
 )
 
-#: Warning 12 is not a rule with a tree to inspect: it is the waiver table itself, printed on
+#: Warning 13 is not a rule with a tree to inspect: it is the waiver table itself, printed on
 #: every run. It lives in `report` because only the reporter knows what each waiver suppressed.
-WAIVER_RULE = (12, "waivers")
+WAIVER_RULE = (13, "waivers")
 
 
 def load(root: Path) -> Repo:
@@ -1059,7 +1215,7 @@ def _verdict(repo: Repo, rule: Rule, result: Result) -> tuple[str, list[str]]:
 
 
 def _waiver_lines(repo: Repo, results: list[tuple[Rule, Result]]) -> list[str]:
-    """Warning 12: every waiver, with what it actually suppressed.
+    """Warning 13: every waiver, with what it actually suppressed.
 
     A waiver naming no rule is called out rather than ignored, and so is one naming rule 1, which
     refuses to be waived. A waiver that quietly does nothing is the same invisible escape hatch

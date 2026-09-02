@@ -7,8 +7,8 @@ checked by no rule at all, with zero alerts and green CI. So the claim these tes
 
 Every test builds a tmp_path tree that is correct in every respect but one, and asserts the run
 marks THAT rule FAIL and names the offending file. The rule name alone would prove nothing: the
-status table prints all twelve names on every run, passing or failing, so the assertions read the
-status word out of the table rather than grepping the output for a name.
+status table prints all thirteen names on every run, passing or failing, so the assertions read
+the status word out of the table rather than grepping the output for a name.
 
 Conformance is invoked as a SUBPROCESS, so what is under test is the command an agent runs and
 CI runs, not an internal function that could be refactored into something the command no longer
@@ -39,6 +39,10 @@ FRONT_MATTER = "---\nsearch:\n  exclude: true\n---\n\n"
 PYPROJECT = """\
 [project]
 name = "example"
+
+[tool.pixi.tasks]
+build = "python -m build"
+test = "pytest"
 
 [tool.liulab.agent-docs]
 "AGENTS.md" = "LengthDoc"
@@ -111,6 +115,8 @@ def publishes(root: Path, on: str) -> None:
 
     The body is a real job with real steps, not a bare `on:` block: the accessor the rule reads
     parses the whole file, and a fixture that carried triggers alone would never exercise that.
+    Its one command invokes `build`, which `PYPROJECT` declares, so rule 11 stays green here and
+    rule 9 is the only thing these trees vary.
     """
     write(
         root,
@@ -126,6 +132,25 @@ def publishes(root: Path, on: str) -> None:
     write(root, "CHANGELOG.md", "# Changelog\n\nNothing yet.\n")
 
 
+def runs(root: Path, *commands: str, job: str = "check") -> None:
+    """A `ci.yml` whose one job checks out an action and then runs each command given.
+
+    Not `release.yml`: that path is rule 9's premise and rule 8's, and a rule 11 fixture must vary
+    nothing but the commands. The leading `uses:` step is in every tree here on purpose — it is
+    what proves an action step is passed over rather than merely absent.
+    """
+    steps = "".join(f"      - run: {command}\n" for command in commands)
+    write(
+        root,
+        ".github/workflows/ci.yml",
+        "name: ci\non:\n  pull_request:\njobs:\n"
+        f"  {job}:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v7\n" + steps,
+    )
+
+
 def add_skill(root: Path, name: str) -> None:
     """A skill and both committed discovery symlinks, relative, as `install.py` writes them."""
     write(root, f"skills/{name}/SKILL.md", f"---\nname: {name}\n---\n\n# {name}\n")
@@ -139,10 +164,10 @@ def add_skill(root: Path, name: str) -> None:
 def repo(tmp_path: Path) -> Path:
     """A tree that passes every rule, for one test to break in exactly one way.
 
-    It has no `src/` and no release workflow, so rule 8's two conditionals and rule 9 are all
-    vacuous here; the tests that care add the premise, rule 9's through `publishes`. It has no
-    `skills/init-repo/`, so rule 1 and warning 11 are both live — the state a derived repo is in,
-    and the only state where they check anything.
+    It has no `src/`, no workflow at all and so no release workflow, so rule 8's two conditionals,
+    rule 9 and rule 11 are all vacuous here; the tests that care add the premise, through
+    `publishes` and `runs`. It has no `skills/init-repo/`, so rule 1 and warning 12 are both live
+    — the state a derived repo is in, and the only state where they check anything.
     """
     root = tmp_path / "repo"
     write(root, "pyproject.toml", PYPROJECT)
@@ -183,8 +208,8 @@ def statuses(proc: subprocess.CompletedProcess[str]) -> dict[str, str]:
     """The verdict the run gave each rule, read off its own status table.
 
     Asserting on the status word rather than on the presence of a rule NAME is the point: the
-    table prints all twelve names on every run, so `"repo-shape" in output` is true of a green run
-    and would prove nothing at all.
+    table prints all thirteen names on every run, so `"repo-shape" in output` is true of a green
+    run and would prove nothing at all.
     """
     found: dict[str, str] = {}
     for line in proc.stdout.splitlines():
@@ -213,8 +238,9 @@ def test_the_fixture_tree_passes_every_rule(repo: Path) -> None:
         "skill-symlinks",
         "repo-shape",
         "release-trigger",
-        "init-sentinel",
         "single-toolchain",
+        "workflow-step-tasks",
+        "init-sentinel",
         "waivers",
     }
     assert verdicts["placeholder-rename"] == "ok"  # live, not gated off
@@ -276,7 +302,7 @@ def test_rule_1_refuses_to_be_waived(repo: Path) -> None:
     assert proc.returncode == 1
     assert statuses(proc)["placeholder-rename"] == "FAIL"
     assert "cannot be waived" in proc.stderr
-    assert "REFUSED" in proc.stdout  # and warning 12 still prints it
+    assert "REFUSED" in proc.stdout  # and warning 13 still prints it
 
 
 def test_rule_2_fires_on_a_page_that_is_not_excluded_from_search(repo: Path) -> None:
@@ -489,7 +515,7 @@ def test_rule_9_is_vacuous_and_not_passing_when_the_repo_publishes_nothing(repo:
     )
 
 
-def test_warning_10_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> None:
+def test_warning_12_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> None:
     write(
         repo,
         "AGENTS.md",
@@ -501,7 +527,7 @@ def test_warning_10_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> No
     assert "AGENTS.md still carries the `/init` sentinel" in flat(proc.stdout)
 
 
-def test_warning_10_is_silent_while_the_init_skill_is_the_nag(repo: Path) -> None:
+def test_warning_12_is_silent_while_the_init_skill_is_the_nag(repo: Path) -> None:
     write(
         repo,
         "AGENTS.md",
@@ -522,7 +548,7 @@ def test_a_waiver_suppresses_its_rule_and_is_still_printed(repo: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert statuses(proc)["glossary-entry-length"] == "waived"
     assert f"1 problem(s) suppressed: {reason}" in flat(proc.stdout)
-    # and warning 12 prints it a second time, in the waiver table
+    # and warning 13 prints it a second time, in the waiver table
     assert f"glossary-entry-length: 1 problem(s) suppressed — {reason}" in flat(proc.stdout)
 
 
@@ -555,7 +581,7 @@ def test_every_failure_is_reported_and_not_just_the_first(repo: Path) -> None:
     assert verdicts["agent-docs-unpublished"] == "FAIL"
     assert verdicts["skill-file-location"] == "FAIL"
     assert verdicts["repo-shape"] == "FAIL"
-    assert "3 of 10 rules failed" in proc.stderr
+    assert "3 of 11 rules failed" in proc.stderr
 
 
 def test_rule_10_fires_on_a_pre_commit_configuration(repo: Path) -> None:
@@ -622,3 +648,186 @@ def test_rule_10_says_which_second_toolchains_it_looked_for(repo: Path) -> None:
     assert statuses(proc)["single-toolchain"] == "ok"
     assert "8 second toolchain(s) looked for" in flat(proc.stdout)
     assert "pre-commit, pip, conda, pipenv, setuptools, poetry, uv, pdm" in flat(proc.stdout)
+
+
+def test_rule_11_fires_on_a_step_that_runs_a_bare_command(repo: Path) -> None:
+    runs(repo, "pytest -q")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["workflow-step-tasks"] == "FAIL"
+    assert (
+        ".github/workflows/ci.yml job `check` step 1 runs a command rather than `pixi run <task>`"
+        in proc.stderr
+    )
+    assert "declare what it runs as a task in [tool.pixi.tasks]" in flat(proc.stderr)
+
+
+def test_rule_11_passes_a_step_that_invokes_a_declared_task(repo: Path) -> None:
+    # Two spellings, because the template writes both: a plain task, and one reached through an
+    # environment flag. A rule that read `pixi run <word>` and stopped would fail the second.
+    runs(repo, "pixi run build", "pixi run -e test test")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["workflow-step-tasks"] == "ok"
+    # The anti-vacuity assertion. A rule handed no steps passes every workflow ever written, so
+    # the green above means something only once the run says how many steps it read.
+    assert "2 step(s) that run a command, across 1 workflow(s), against 2 declared task(s)" in flat(
+        proc.stdout
+    )
+
+
+def test_rule_11_reads_past_the_environment_flag_to_the_task(repo: Path) -> None:
+    # `test` is BOTH an environment and a declared task here, which is the trap: a rule that
+    # accepted any declared name among the tokens would call this green and let the inlined
+    # `pytest` through — the exact drift the rule exists to catch, hidden behind a `-e`.
+    runs(repo, "pixi run -e test pytest")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["workflow-step-tasks"] == "FAIL"
+    assert "step 1 invokes `pytest`, which this repo declares no task by" in proc.stderr
+
+
+def test_rule_11_fires_on_a_task_nobody_declared(repo: Path) -> None:
+    # Not an inlined command: it follows the convention exactly and names a task that does not
+    # exist. Nothing runs it until the workflow does, and this one is `ci.yml`; on `release.yml`
+    # the first run is the release.
+    runs(repo, "pixi run typecheck")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["workflow-step-tasks"] == "FAIL"
+    assert "invokes `typecheck`, which this repo declares no task by" in proc.stderr
+    assert "declare `typecheck` in pyproject.toml under [tool.pixi.tasks]" in flat(proc.stderr)
+
+
+def test_rule_11_finds_a_task_declared_on_a_feature(repo: Path) -> None:
+    # `docs-build` is on the `docs` FEATURE in the real manifest, not on the workspace. A rule
+    # reading `[tool.pixi.tasks]` alone would fail the docs job of a workflow that is correct.
+    write(
+        repo, "pyproject.toml", PYPROJECT + '\n[tool.pixi.feature.docs.tasks]\ndocs-build = "z"\n'
+    )
+    runs(repo, "pixi run docs-build")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["workflow-step-tasks"] == "ok"
+    assert "against 3 declared task(s)" in flat(proc.stdout)
+
+
+def test_rule_11_does_not_flag_a_step_that_uses_an_action(repo: Path) -> None:
+    # Three `uses:` steps, one of them carrying a command line in its `with:` block. An action is
+    # a dependency the workflow pulls in, not a step of this repo's build, so none of them is a
+    # task that went missing — and the count in the note is what proves they were passed over
+    # rather than merely absent.
+    write(
+        repo,
+        ".github/workflows/ci.yml",
+        "name: ci\non:\n  pull_request:\njobs:\n"
+        "  check:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v7\n"
+        "      - uses: prefix-dev/setup-pixi@v0.10.2\n"
+        "        with:\n"
+        "          environments: default\n"
+        "      - run: pixi run build\n"
+        "      - uses: actions/upload-artifact@v7\n"
+        "        with:\n"
+        "          args: rm -rf dist\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["workflow-step-tasks"] == "ok"
+    assert "1 step(s) that run a command" in flat(proc.stdout)
+
+
+def test_rule_11_fires_on_a_command_chained_onto_a_task(repo: Path) -> None:
+    # It does invoke a declared task. What follows the task is the same drift one level down: a
+    # laptop running `pixi run build` never deletes anything.
+    runs(repo, "pixi run build && rm -rf dist")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["workflow-step-tasks"] == "FAIL"
+    assert "step 1 runs a command rather than `pixi run <task>`" in proc.stderr
+
+
+def test_rule_11_fires_on_a_multi_line_script(repo: Path) -> None:
+    write(
+        repo,
+        ".github/workflows/ci.yml",
+        "name: ci\non:\n  pull_request:\njobs:\n"
+        "  check:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - name: Everything at once\n"
+        "        run: |\n"
+        "          pixi run build\n"
+        "          pixi run -e test test\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["workflow-step-tasks"] == "FAIL"
+    # Named, because this step has a `name:` and a reader should not have to count steps.
+    assert "step 0 (Everything at once) runs a command" in proc.stderr
+
+
+def test_rule_11_reports_a_task_named_by_an_expression_as_unresolved(repo: Path) -> None:
+    # A matrix over tasks. GitHub substitutes the expression when the job runs, so the second step
+    # names a task this cannot look up — reported, not failed, since a rule that cannot evaluate
+    # its premise has checked nothing. The first step shows an expression somewhere OTHER than the
+    # task name is resolved past and not counted.
+    runs(repo, "pixi run -e ${{ matrix.environment }} test", "pixi run ${{ matrix.task }}")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["workflow-step-tasks"] == "ok"
+    assert "2 step(s) that run a command" in flat(proc.stdout)
+    assert "1 step(s) name their task with a `${{}}` expression" in flat(proc.stdout)
+
+
+def test_rule_11_is_vacuous_and_not_passing_when_no_workflow_runs_a_command(repo: Path) -> None:
+    # A repo whose workflows are all actions, or that has none at all. Nothing was checked, and a
+    # green here would read as "every step invokes a task", which this run has no evidence for.
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["workflow-step-tasks"] == "--"
+    assert "not checked: no tracked workflow has a step that runs a command" in flat(proc.stdout)
+
+
+def test_the_workflow_reader_flattens_every_job_and_not_just_the_first(repo: Path) -> None:
+    # The step the rule must find is the LAST step of the SECOND job. A reader that stopped at the
+    # first job, or at a job's first step, would call this tree green.
+    write(
+        repo,
+        ".github/workflows/ci.yml",
+        "name: ci\non:\n  pull_request:\njobs:\n"
+        "  check:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v7\n"
+        "      - run: pixi run build\n"
+        "  test:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v7\n"
+        "      - run: pixi run -e test test\n"
+        "      - run: coverage report\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["workflow-step-tasks"] == "FAIL"
+    assert ".github/workflows/ci.yml job `test` step 2 runs a command" in proc.stderr
+    # One problem and not three: the other two steps of the two jobs were read and were fine.
+    assert "workflow-step-tasks FAIL 1 problem(s)" in flat(proc.stdout)
+
+
+def test_a_workflow_that_will_not_parse_is_read_as_empty_and_not_as_an_exception(
+    repo: Path,
+) -> None:
+    # A derived repo's unusual workflow must not turn a conformance rule into a crash. The file
+    # counts as a workflow and contributes no steps, so the rules that read workflows keep
+    # reporting on the ones they could read.
+    write(repo, ".github/workflows/broken.yml", "name: broken\non: [\njobs: }{\n")
+    runs(repo, "pixi run build")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "Traceback" not in proc.stderr
+    assert statuses(proc)["workflow-step-tasks"] == "ok"
+    assert "1 step(s) that run a command, across 2 workflow(s)" in flat(proc.stdout)
