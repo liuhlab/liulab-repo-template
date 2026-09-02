@@ -152,6 +152,11 @@ venvPath = ".pixi/envs"
 venv = "default"
 # No `pythonVersion`: taken from the interpreter in the environment above.
 typeCheckingMode = "standard"
+# Not redundant: `standard` does not check that a parameter is annotated at all. `Any`
+# satisfies it, so the fix is always in the file you are editing.
+reportMissingParameterType = "error"
+# Deliberately NOT `reportUnknownParameterType`: it also fails annotated parameters and
+# inferred return types whose types an untyped dependency owns. Not a bar a lab repo can meet.
 useLibraryCodeForTypes = true
 reportMissingTypeStubs = "none"
 

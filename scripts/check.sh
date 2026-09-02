@@ -13,6 +13,12 @@
 # everything. A red run is read to find the failure, and the full output of every
 # green step is thousands of lines of nothing standing between the reader and it.
 #
+# Exit status: 1 when a step ran and failed, 2 when the gate itself could not run —
+# a usage error, or a capture directory it could not make. `scripts/conformance.py`,
+# the one step this repo writes rather than installs, spells its own two the same way,
+# and the summary prints each step's own status, so "could not run" reaches the reader
+# as itself rather than as a rule nobody broke.
+#
 # The step list lives in the `check-static` task in pyproject.toml and nowhere else,
 # so adding a step is one more word in one place and the local gate cannot drift
 # from CI, which invokes the same task names.

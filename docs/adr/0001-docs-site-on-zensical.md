@@ -30,11 +30,12 @@ Three gaps, each with a named workaround:
   front matter, and `mkdocs.yml` carries an explicit `nav:`. Front matter does nothing
   about the navbar; `nav:` does nothing about search. Both, always.
 - **`--strict` validates links, not the `nav:`.** A nav entry naming a missing file failed
-  a strict mkdocs build and passes this one, and no setting turns that back on. Dead links
-  and dead anchors still fail, so `--strict` is worth passing. The measured list of what it
-  catches and misses is a comment in `mkdocs.yml`, beside the `nav:` a maintainer edits and
-  the settings it turns on — this record is deleted from a repo made from the template, and
-  the gap is not.
+  a strict mkdocs build and passes this one, and no setting turns that back on. Conformance
+  rule `nav-target-exists` fails it instead: a setting that cannot be shown to be honoured
+  is not a gate, so the check went where it can be one. Dead links and dead anchors still
+  fail, so `--strict` is worth passing. The measured list of what it catches and misses is a
+  comment in `mkdocs.yml`, beside the `nav:` a maintainer edits and the settings it turns
+  on — this record is deleted from a repo made from the template, and the gap is not.
 
 The research note expected one residue — excluded pages still listed in `sitemap.xml`. With
 an explicit `nav:` that does not happen: zensical builds the sitemap from the nav, so the

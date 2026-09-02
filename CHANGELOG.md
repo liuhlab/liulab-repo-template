@@ -45,3 +45,21 @@ sets one.
   ships switched off, and a comment beside it listing, from measurement, which broken links
   a strict build catches and which three it lets through. A `nav:` entry naming a file that
   is not there is one of the three, and no setting catches it.
+- `reportMissingParameterType` beside the pyright mode, because `standard` does not check
+  that a parameter is annotated at all — the bar was kept by discipline and nothing would
+  have noticed a repo dropping it. Its sibling `reportUnknownParameterType` was considered
+  and declined: it also fails parameters that *are* annotated when the type belongs to an
+  untyped dependency, which is not a bar a lab repo can hold.
+- A conformance rule that fails a `nav:` entry naming a file the repo does not track, or one
+  that sits outside the site source. That is the broken site the builder does not validate
+  at all — it reports no issues, exits 0, and publishes a menu item that 404s — so the check
+  had to go somewhere it could be one. It reads every site config, so a repo building more
+  than one site from one docs tree has both navs checked.
+
+### Changed
+
+- `conformance` now exits 2 when it could not run at all: no `.git`, no `pyproject.toml`, or
+  a `pyproject.toml` it cannot read. It still exits 1 when it ran and a rule failed, and 0
+  when every rule passed. Both used to exit 1, so a bad checkout looked just like a repo that
+  broke a rule. The two want opposite answers: one is a repo to fix, the other is a repo that
+  nothing checked. `scripts/check.sh` already used 2 that way.
