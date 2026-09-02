@@ -45,3 +45,8 @@ sets one.
   ships switched off, and a comment beside it listing, from measurement, which broken links
   a strict build catches and which three it lets through. A `nav:` entry naming a file that
   is not there is one of the three, and no setting catches it.
+- `reportMissingParameterType` beside the pyright mode, because `standard` does not check
+  that a parameter is annotated at all — the bar was kept by discipline and nothing would
+  have noticed a repo dropping it. Its sibling `reportUnknownParameterType` was considered
+  and declined: it also fails parameters that *are* annotated when the type belongs to an
+  untyped dependency, which is not a bar a lab repo can hold.
