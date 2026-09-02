@@ -5,7 +5,7 @@
     python scripts/conformance.py [--root PATH]
 
 It states the RULE, not the file contents — a pull model, so a repo that legitimately diverges
-stays green while the shared conventions stay checked. Ten rules: eight fail, two only warn.
+stays green while the shared conventions stay checked. Eleven rules: nine fail, two only warn.
 
 Three things it does on purpose:
 
@@ -55,7 +55,7 @@ import yaml
 #: neither happens.
 PLACEHOLDER = "new" + "pkg"
 
-#: Rule 1 and warning 9 are both gated on this directory, and it is the only discriminator either
+#: Rule 1 and warning 10 are both gated on this directory, and it is the only discriminator either
 #: needs. While it is here, `init-repo` has not run: the placeholder is still the repo's own name,
 #: and the auto-discovered skill is itself the nag. Once it is gone the repo claims to be its own,
 #: and both rules start checking.
@@ -67,6 +67,18 @@ UNWAIVABLE = "placeholder-rename"
 #: Where `mkdocs.yml` puts the site source when it does not say. Rule 2 is scoped to the pages the
 #: site publishes, so it reads this rather than assuming.
 DEFAULT_DOCS_DIR = "docs"
+
+#: Where GitHub reads workflows, and the two file endings it accepts. Nothing below this
+#: directory is a workflow, and nothing above it is read.
+WORKFLOW_DIR = ".github/workflows/"
+WORKFLOW_SUFFIXES = (".yml", ".yaml")
+
+#: The publishing workflow, named by PATH rather than sniffed out of its contents. That is a
+#: deliberate choice and not a shortcut: a package index binds its trusted publisher to an owner,
+#: a repository and a WORKFLOW FILENAME, so this name is external configuration — rename the file
+#: and the repo cannot publish at all. `init-repo` also deletes it by this exact path. Rules 8 and
+#: 9 both read it, so the name is written here once and nowhere else.
+RELEASE_WORKFLOW = f"{WORKFLOW_DIR}release.yml"
 
 #: Vale's spelling of on and off. Both forms appear in the wild; the gate accepts either.
 VALE_ON = {"YES", "TRUE", "ON"}
@@ -126,6 +138,108 @@ class Result:
 
     problems: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Step:
+    """One step of one job, flattened out of the workflow it came from.
+
+    Attributes
+    ----------
+    workflow
+        Repo-relative path of the file this step was written in.
+    job
+        The job key it sits under, so a report can say where without a second lookup.
+    index
+        Its position in that job's `steps:` list, counting from zero. A step need not have a
+        `name:`, and this is the only thing that always identifies one.
+    name, uses, run
+        The three keys a rule asks about, each ``None`` when the step does not set it. A step
+        has `uses` or `run` and never both.
+    """
+
+    workflow: str
+    job: str
+    index: int
+    name: str | None
+    uses: str | None
+    run: str | None
+
+
+@dataclass(frozen=True)
+class Workflow:
+    """One workflow definition, parsed once for every rule that reads workflows.
+
+    Attributes
+    ----------
+    path
+        Repo-relative path, e.g. `.github/workflows/ci.yml`.
+    name
+        The `name:` key, or the file stem when the workflow does not name itself.
+    triggers
+        The `on:` block, normalized to event name -> the configuration under it, with `{}` for
+        an event written bare. All three spellings — `on: push`, `on: [push, pull_request]` and
+        the mapping form — arrive here identically, so a rule never has to ask which was used.
+    steps
+        Every step of every job, in file order, each carrying the job it came from. Flat because
+        the rules that read steps ask about all of them, and a step knows its own job.
+    """
+
+    path: str
+    name: str
+    triggers: dict[str, Any]
+    steps: tuple[Step, ...]
+
+
+def _string(value: Any) -> str | None:
+    """One YAML scalar as a string, or ``None`` when the key was absent or not a scalar."""
+    return value if isinstance(value, str) else None
+
+
+def _triggers(document: dict[Any, Any]) -> dict[str, Any]:
+    """Read a workflow's `on:` block as event name -> its configuration.
+
+    Read under two keys, because YAML 1.1 resolves an unquoted `on` to the boolean true: every
+    workflow GitHub accepts arrives with its triggers under ``True``, and `document["on"]` finds
+    them only in the rare file that quoted the key. Looking under one key alone is not a parse
+    bug that shows up later — it makes every rule about triggers pass on nothing.
+    """
+    raw = document.get("on", document.get(True))
+    if isinstance(raw, str):
+        return {raw: {}}
+    if isinstance(raw, list):
+        return {str(event): {} for event in raw}
+    if isinstance(raw, dict):
+        return {str(event): {} if config is None else config for event, config in raw.items()}
+    return {}
+
+
+def _steps(path: str, document: dict[Any, Any]) -> tuple[Step, ...]:
+    """Every step of every job in one workflow, flattened, in file order."""
+    jobs = document.get("jobs")
+    if not isinstance(jobs, dict):
+        return ()
+    steps: list[Step] = []
+    for job_id, job in jobs.items():
+        if not isinstance(job, dict):
+            continue
+        raw = job.get("steps")
+        if not isinstance(raw, list):
+            continue
+        for index, step in enumerate(raw):
+            if not isinstance(step, dict):
+                continue
+            steps.append(
+                Step(
+                    workflow=path,
+                    job=str(job_id),
+                    index=index,
+                    name=_string(step.get("name")),
+                    uses=_string(step.get("uses")),
+                    run=_string(step.get("run")),
+                )
+            )
+    return tuple(steps)
 
 
 @dataclass
@@ -195,6 +309,41 @@ class Repo:
                 continue
             entries[posixpath.normpath(f"{self.docs_dir}/{raw}")] = raw
         return entries
+
+    @cached_property
+    def workflows(self) -> tuple[Workflow, ...]:
+        """Every tracked workflow definition, parsed, in path order.
+
+        TRACKED and not globbed off disk: a workflow GitHub never sees is not a workflow, and
+        every other rule here reads the same list.
+
+        The rules that read workflows want different halves of one — what triggers it, or what
+        its steps invoke — so :class:`Workflow` exposes both and no rule parses YAML itself. A
+        file that will not parse, or that is not a mapping, becomes an empty workflow rather than
+        an exception: `_TolerantLoader` already shrugs at an unknown tag, and a derived repo's
+        unusual workflow must not turn a conformance rule into a crash.
+        """
+        found: list[Workflow] = []
+        for rel in self.tracked:
+            if not rel.startswith(WORKFLOW_DIR) or not rel.endswith(WORKFLOW_SUFFIXES):
+                continue
+            text = self.read(rel)
+            if text is None:
+                continue
+            try:
+                loaded = yaml.load(text, Loader=_TolerantLoader)
+            except yaml.YAMLError:
+                loaded = None
+            document: dict[Any, Any] = loaded if isinstance(loaded, dict) else {}
+            found.append(
+                Workflow(
+                    path=rel,
+                    name=_string(document.get("name")) or PurePosixPath(rel).stem,
+                    triggers=_triggers(document),
+                    steps=_steps(rel, document),
+                )
+            )
+        return tuple(found)
 
 
 def _walk_strings(node: Any) -> Iterator[str]:
@@ -292,7 +441,7 @@ def _glossary_entries(text: str) -> list[tuple[str, int]]:
 
 
 # --------------------------------------------------------------------------------------
-# The rules. Eight fail, two warn. Each returns what it found; nothing here exits or prints.
+# The rules. Nine fail, two warn. Each returns what it found; nothing here exits or prints.
 # --------------------------------------------------------------------------------------
 
 
@@ -550,7 +699,8 @@ def rule_skill_symlinks(repo: Repo) -> Result:
 def rule_repo_shape(repo: Repo) -> Result:
     """8. If there is a package there are tests; if there is a release workflow there is a log."""
     result = Result()
-    release = ".github/workflows/release.yml"
+    # Named once, at RELEASE_WORKFLOW, because rule 9 keys on the same file.
+    release = RELEASE_WORKFLOW
     # Both halves are CONDITIONAL, and an absent premise is vacuous rather than failing: a repo
     # with no package is not a repo that failed to have tests. That is the whole shape of the
     # rule, and it is why the notes below say which premise was absent.
@@ -583,8 +733,64 @@ def rule_repo_shape(repo: Repo) -> Result:
     return result
 
 
+def _tag_push_events(workflow: Workflow) -> list[str]:
+    """List the triggers in one workflow that pushing a tag can fire, spelled as they are written.
+
+    Three of them, and only the first is the one people think of:
+
+    - `push:` with a `tags:` or `tags-ignore:` filter — the trigger written on purpose.
+    - `push:` naming no branch filter at all. An absent filter is not "no refs", it is EVERY
+      ref, so a bare `push:` fires on a tag exactly as it fires on a branch. `paths:` narrows
+      which files, never which refs.
+    - `create`, which fires on a branch or a tag coming into existence, and a pushed tag is a
+      tag coming into existence.
+
+    A `push:` that names `branches:` or `branches-ignore:` is a branch trigger and is absent
+    from this list: naming any branch filter is what stops tags reaching the workflow.
+    """
+    fired: list[str] = []
+    if "push" in workflow.triggers:
+        config = workflow.triggers["push"]
+        config = config if isinstance(config, dict) else {}
+        if "tags" in config or "tags-ignore" in config:
+            fired.append("`on: push:` names `tags:`")
+        elif not ("branches" in config or "branches-ignore" in config):
+            fired.append("`on: push:` names no branch filter, so it fires on every ref, tags too")
+    if "create" in workflow.triggers:
+        fired.append("`on: create:` fires when a tag comes into existence")
+    return fired
+
+
+def rule_release_trigger(repo: Repo) -> Result:
+    """9. Nothing a tag push fires can trigger the publishing workflow."""
+    result = Result()
+    publishing = [w for w in repo.workflows if w.path == RELEASE_WORKFLOW]
+    if not publishing:
+        result.notes.append(
+            f"not checked: no {RELEASE_WORKFLOW}, so this repo publishes to no package index"
+        )
+        return result
+    for workflow in publishing:
+        for fired in _tag_push_events(workflow):
+            result.problems.append(
+                _problem(
+                    f"{workflow.path} can be triggered by a tag push: {fired}",
+                    "publishing is the one act in this toolchain that cannot be undone — a "
+                    "version can be neither unpublished nor reused — and `init-repo` pushes a "
+                    "first tag on a repo's opening day, so this trigger publishes from a repo "
+                    "nobody has finished naming",
+                    "trigger it on `release:` with `types: [published]`, which is a person "
+                    "publishing a GitHub Release on purpose, and add `workflow_dispatch:` for "
+                    "re-running one that failed",
+                )
+            )
+    events = ", ".join(sorted(event for w in publishing for event in w.triggers))
+    result.notes.append(f"{RELEASE_WORKFLOW} is triggered by {events or 'nothing'}")
+    return result
+
+
 def warning_init_sentinel(repo: Repo) -> Result:
-    """9. `AGENTS.md` still carries the line telling you to run `/init`."""
+    """10. `AGENTS.md` still carries the line telling you to run `/init`."""
     result = Result()
     if repo.exists(INIT_SKILL):
         result.notes.append(f"not checked: {INIT_SKILL}/ is here, and that skill is the nag")
@@ -678,6 +884,13 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         9,
+        "release-trigger",
+        f"{RELEASE_WORKFLOW} is triggered by publishing a GitHub Release and by nothing a tag "
+        "push fires — not `push: tags:`, not a `push:` with no branch filter, not `create`",
+        rule_release_trigger,
+    ),
+    Rule(
+        10,
         "init-sentinel",
         "AGENTS.md is still the template's generic copy",
         warning_init_sentinel,
@@ -685,9 +898,9 @@ RULES: tuple[Rule, ...] = (
     ),
 )
 
-#: Warning 10 is not a rule with a tree to inspect: it is the waiver table itself, printed on
+#: Warning 11 is not a rule with a tree to inspect: it is the waiver table itself, printed on
 #: every run. It lives in `report` because only the reporter knows what each waiver suppressed.
-WAIVER_RULE = (10, "waivers")
+WAIVER_RULE = (11, "waivers")
 
 
 def load(root: Path) -> Repo:
@@ -738,7 +951,7 @@ def _verdict(repo: Repo, rule: Rule, result: Result) -> tuple[str, list[str]]:
 
 
 def _waiver_lines(repo: Repo, results: list[tuple[Rule, Result]]) -> list[str]:
-    """Warning 10: every waiver, with what it actually suppressed.
+    """Warning 11: every waiver, with what it actually suppressed.
 
     A waiver naming no rule is called out rather than ignored, and so is one naming rule 1, which
     refuses to be waived. A waiver that quietly does nothing is the same invisible escape hatch
