@@ -36,7 +36,7 @@ sets one.
   supports a range of Python versions still passes.
 - A conformance rule that fails a workflow step running a command of its own instead of
   `pixi run <task>`, or naming a task nothing declares. The step list stays in one place,
-  so what CI runs and what your laptop runs cannot quietly stop being the same thing.
+  so the command CI runs is one you can run too.
 - `docs/template/index.md`, the page that says what the template ships and how to make a
   repo from it, and `mkdocs.template.yml`, which inherits `mkdocs.yml` and names the site
   after this repo while the shipped config keeps the placeholder. Both are template-only:
@@ -76,6 +76,19 @@ sets one.
   ['v20*']`, which CalVer versions can never match, now passes. The rule reads one path,
   `.github/workflows/release.yml`, and its own report says so: the same trigger under another
   filename is outside it.
+- The conformance rule about workflow steps now lets a step pass arguments to its task, after
+  `--`, and prints them on every run instead of failing. The clause that forbade them had no
+  failing fixture and was refuted by the fix it prescribed: moving the flag into a task of its
+  own passes the rule, so the divergence it named was already allowed through the compliant
+  path. A token after the task with no `--` still fails, because pixi reads it as its own
+  option, and so does a shell operator anywhere after the task. The list of pixi options that
+  take a separate value was measured off `pixi run --help` and had eight spellings of twelve
+  options, so `pixi run -p linux-64 build` — a step that literally is `pixi run <task>` — was
+  being told it ran a command.
+- `ci.yml`'s header no longer says CI and a laptop cannot drift. The rule reads the `run:` line
+  and nothing else, so `env:`, `working-directory:`, `shell:` and a local composite action can
+  each change what a step does without changing that line. Those limits are now written down in
+  the rule rather than implied away.
 - `conformance` now exits 2 when it could not run at all: no `.git`, no `pyproject.toml`, or
   a `pyproject.toml` it cannot read. It still exits 1 when it ran and a rule failed, and 0
   when every rule passed. Both used to exit 1, so a bad checkout looked just like a repo that

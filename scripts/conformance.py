@@ -130,23 +130,42 @@ VALE_OFF = {"NO", "FALSE", "OFF"}
 PIXI_RUN = "pixi run"
 TASK_TABLE = "[tool.pixi.tasks]"
 
-#: The `pixi run` options that take a SEPARATE value, so the token after one is that value and
-#: never the task name. The `--option=value` form needs no entry, being one token. Anything else
-#: beginning with `-` is read as a switch, so an option pixi grows later would be mistaken for the
-#: task and reported LOUDLY — the safe direction of error for a check whose whole job is to notice
-#: drift nobody announced.
+#: Every `pixi run` option that takes a SEPARATE value, so the token after one is that value and
+#: never the task name. Both spellings of each, because a workflow writes either. The
+#: `--option=value` form needs no entry, being one token.
+#:
+#: READ OFF `pixi run --help`, at pixi 0.71.2, and not guessed. A missing spelling is not a safe
+#: error: the option's value is mistaken for the task, and a step that literally is
+#: `pixi run -p linux-64 build` is told it runs a command rather than `pixi run <task>`. That
+#: shipped — the list held eight spellings of the twelve options pixi has. Re-measure when the
+#: pixi version moves, and add both spellings of anything new.
 PIXI_VALUE_OPTIONS = frozenset(
     {
         "-e",
         "--environment",
+        "-p",
+        "--platform",
+        "-m",
         "--manifest-path",
+        "-w",
+        "--workspace",
         "--color",
         "--auth-file",
+        "--config-file",
+        "--pinning-strategy",
         "--pypi-keyring-provider",
+        "--tls-root-certs",
         "--concurrent-solves",
         "--concurrent-downloads",
     }
 )
+
+#: What separates a task from the arguments passed to it, and the tokens that are not arguments
+#: at all. pixi reads a bare `--durations=10` as its own option and refuses to run, so a step
+#: passing one without the separator is broken before this rule sees it. A shell operator after
+#: the task starts a second command, which is the drift rule 12 is about.
+ARGUMENT_SEPARATOR = "--"
+SHELL_OPERATORS = frozenset({"&&", "||", "|", ";", "&"})
 
 #: What a `${{ ... }}` expression is replaced by before a step's command is split into tokens.
 #: GitHub substitutes these when the job runs, and `shlex` would split one into three tokens and
@@ -622,18 +641,40 @@ def _task_names(node: Any) -> Iterator[str]:
             yield from _task_names(value)
 
 
-def _invoked_task(run: str) -> str | None:
+@dataclass(frozen=True)
+class Invocation:
+    """One `pixi run` command line, read apart.
+
+    Attributes
+    ----------
+    task
+        The task name — the first token that is neither an option nor an option's value.
+    arguments
+        Whatever the step passes to that task after `--`, empty for most steps. Kept rather
+        than discarded because rule 12 prints them: an argument only CI passes is a legitimate
+        thing to write and a thing a reader should be able to see without opening the workflow.
+    """
+
+    task: str
+    arguments: tuple[str, ...]
+
+
+def _invoked_task(run: str) -> Invocation | None:
     """Read the pixi task one step's `run:` script invokes, or ``None`` when it runs a command.
 
-    The accepted shape is `pixi run`, any pixi options, and one more token — the task. Options are
-    skipped on both sides of `run`, so `pixi run -e test test` and `pixi run docs-build` arrive
-    the same way and no spelling is privileged.
+    The accepted shape is `pixi run`, any pixi options, the task, and then — optionally — `--`
+    and arguments for it. Options are skipped on both sides of `run`, so `pixi run -e test test`
+    and `pixi run docs-build` arrive the same way and no spelling is privileged.
 
-    Nothing may follow the task, and that is the strict half of the rule rather than an oversight.
-    A step passing arguments of its own is the drift this rule is about, one level down: the
-    arguments a task runs with belong in the task, which is exactly where `check-static` keeps its
-    own list. A script of several lines, or two commands joined by `&&`, leaves tokens after the
-    task and lands here too.
+    Arguments are ACCEPTED and reported, not forbidden. A flag a workflow wants and a laptop does
+    not — `--durations=10` on the CI run of the test suite — is ordinary, and forbidding it only
+    moves the divergence into a second task definition, where nothing checks it against the first.
+    What the rule can still say is that the command came from the task table.
+
+    Two shapes are still not this one. Tokens after the task that do not start with `--`: pixi
+    would read them as its own options and refuse to run, so the step is broken already. And a
+    shell operator anywhere after the task — `pixi run build && rm -rf dist` is two commands, and
+    the second one is what no `pixi run` does. A script of several lines lands here too.
     """
     script = _EXPRESSION_RE.sub(EXPRESSION, run)
     try:
@@ -647,9 +688,15 @@ def _invoked_task(run: str) -> str | None:
     if index >= len(tokens) or tokens[index] != "run":
         return None
     index = _skip_options(tokens, index + 1)
-    if len(tokens) - index != 1:
+    if index >= len(tokens):
         return None
-    return tokens[index]
+    task, rest = tokens[index], tokens[index + 1 :]
+    if rest and rest[0] != ARGUMENT_SEPARATOR:
+        return None
+    arguments = rest[1:]
+    if any(token in SHELL_OPERATORS for token in arguments):
+        return None
+    return Invocation(task=task, arguments=tuple(arguments))
 
 
 def _skip_options(tokens: list[str], index: int) -> int:
@@ -1362,7 +1409,22 @@ def rule_python_version_agreement(repo: Repo) -> Result:
 
 
 def rule_workflow_step_tasks(repo: Repo) -> Result:
-    """12. Every workflow step that runs anything invokes a task the manifest declares."""
+    """12. Every workflow step that runs anything invokes a task the manifest declares.
+
+    What this verifies is that the command a step runs is DECLARED — its text lives in the task
+    table, where a person can read it and a laptop can run it. It is not a guarantee that CI and
+    a laptop run the same thing, and it was once written down as one. The known limits, none of
+    them closed here:
+
+    - only the `run:` line is read. `env:` at any of three scopes, `working-directory:`, `shell:`
+      and `--manifest-path` all change what a step does without changing that line;
+    - a step that `uses:` a local composite action runs whatever that action's steps run, and
+      reading those means parsing `.github/actions/**`;
+    - a task may pass arguments after `--`. They are printed in the notes rather than forbidden.
+
+    Closing any of them means parsing foreign files in a check that ships to every lab repo, for
+    a guarantee no wording here can make true. Say the limits instead.
+    """
     result = Result()
     # `uses:` steps are not examined at all, and that is the rule and not an exemption: an action
     # is a dependency the workflow pulls in, not a step of this repo's own build, and there is no
@@ -1372,41 +1434,53 @@ def rule_workflow_step_tasks(repo: Repo) -> Result:
         result.notes.append("not checked: no tracked workflow has a step that runs a command")
         return result
     unresolved = 0
+    passing: list[str] = []
     for step in running:
         where = f"{step.workflow} job `{step.job}` step {step.index}"
         if step.name:
             where += f" ({step.name})"
-        task = _invoked_task(step.run or "")
-        if task is None:
+        invocation = _invoked_task(step.run or "")
+        if invocation is None:
             result.problems.append(
                 _problem(
                     f"{where} runs a command rather than `{PIXI_RUN} <task>`",
-                    "the step list lives in the task table so that CI and a laptop run the same "
-                    "steps by construction. A step that spells out a command runs something no "
+                    "the step list lives in the task table so that what CI runs is something a "
+                    "laptop can run too. A step that spells out a command runs something no "
                     "local `pixi run` does, and both stay green while they quietly stop being the "
                     "same claim — until someone notices the two lists disagree, months later",
-                    f"declare what it runs as a task in {TASK_TABLE}, arguments included, and "
-                    f"make the step `{PIXI_RUN} <that task>`",
+                    f"declare what it runs as a task in {TASK_TABLE} and make the step "
+                    f"`{PIXI_RUN} <that task>`. An argument only CI passes goes after "
+                    f"`{ARGUMENT_SEPARATOR}`",
                 )
             )
-        elif EXPRESSION in task:
+            continue
+        if invocation.arguments:
+            passing.append(f"{where} -> {shlex.join(invocation.arguments)}")
+        if EXPRESSION in invocation.task:
             unresolved += 1
-        elif task not in repo.tasks:
+        elif invocation.task not in repo.tasks:
             result.problems.append(
                 _problem(
-                    f"{where} invokes `{task}`, which this repo declares no task by",
+                    f"{where} invokes `{invocation.task}`, which this repo declares no task by",
                     "a step naming a task nobody declared cannot run at all, and the workflow "
                     "that finds out is often one that runs rarely — the publish, the scheduled "
                     "job — so the break surfaces on the day it costs the most. It reads as if it "
                     "were following the convention, which is what makes it worse than a command",
-                    f"declare `{task}` in pyproject.toml under {TASK_TABLE}, or point the step at "
-                    "a task that is declared",
+                    f"declare `{invocation.task}` in pyproject.toml under {TASK_TABLE}, or point "
+                    "the step at a task that is declared",
                 )
             )
     result.notes.append(
         f"{len(running)} step(s) that run a command, across {len(repo.workflows)} workflow(s), "
         f"against {len(repo.tasks)} declared task(s)"
     )
+    # Printed on every run that has one, green runs included. An argument a workflow passes and a
+    # laptop does not is a real difference between the two, and the rule no longer forbids it —
+    # so the one thing left to do about it is make it visible without opening the workflow.
+    if passing:
+        result.notes.append(
+            f"{len(passing)} step(s) pass arguments to their task: {'; '.join(passing)}"
+        )
     if unresolved:
         result.notes.append(
             f"{unresolved} step(s) name their task with a `" + EXPRESSION + "` expression, which "
@@ -1603,9 +1677,10 @@ RULES: tuple[Rule, ...] = (
     Rule(
         12,
         "workflow-step-tasks",
-        f"every workflow step that runs a command invokes a declared task — `{PIXI_RUN} <task>` "
-        f"and nothing else, with the task in {TASK_TABLE}, so the step list cannot drift from the "
-        "one a laptop runs. A step that `uses:` an action is not a step of this repo's build",
+        f"every workflow step that runs a command invokes a declared task — `{PIXI_RUN} <task>`, "
+        f"with the task in {TASK_TABLE}, so the command CI runs is one a laptop can run too. "
+        f"Arguments are allowed after `{ARGUMENT_SEPARATOR}` and printed in the notes; a shell "
+        "operator is not an argument. A step that `uses:` an action is not a step of this build",
         rule_workflow_step_tasks,
     ),
     Rule(

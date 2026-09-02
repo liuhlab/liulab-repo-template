@@ -1066,6 +1066,53 @@ def test_rule_12_fires_on_a_command_chained_onto_a_task(repo: Path) -> None:
     assert "step 1 runs a command rather than `pixi run <task>`" in proc.stderr
 
 
+def test_rule_12_passes_a_step_that_hands_arguments_to_its_task(repo: Path) -> None:
+    # The shape a sibling repo was told to stop writing: a flag CI wants and a laptop does not.
+    # Putting it in a second task instead passes this rule too, so forbidding it here moved the
+    # divergence into the task table rather than removing it. Accepted, and PRINTED — which is
+    # the whole of what the rule can still do about it.
+    runs(repo, "pixi run -e test test -- --durations=10")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["workflow-step-tasks"] == "ok"
+    assert "1 step(s) pass arguments to their task" in flat(proc.stdout)
+    assert "job `check` step 1 -> --durations=10" in flat(proc.stdout)
+
+
+def test_rule_12_reads_past_a_platform_flag_to_the_task(repo: Path) -> None:
+    # `-p` takes a separate value, so a rule that did not know the spelling would read `linux-64`
+    # as the task and tell a step that literally is `pixi run <task>` that it runs a command. The
+    # option list is read off `pixi run --help` for that reason, and a missing entry is a false
+    # failure rather than a safe one. Building for a cluster platform is ordinary here.
+    runs(repo, "pixi run -p linux-64 build")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["workflow-step-tasks"] == "ok"
+    assert "1 step(s) that run a command" in flat(proc.stdout)
+
+
+def test_rule_12_fires_on_a_token_after_the_task_with_no_separator(repo: Path) -> None:
+    # `build` is declared, and `extra` is not an argument pixi would pass to it: pixi reads what
+    # follows the task as its own, so this step is broken before conformance sees it. The `--`
+    # is what makes an argument an argument.
+    runs(repo, "pixi run build extra")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["workflow-step-tasks"] == "FAIL"
+    assert "step 1 runs a command rather than `pixi run <task>`" in proc.stderr
+    assert "An argument only CI passes goes after `--`" in flat(proc.stderr)
+
+
+def test_rule_12_fires_on_a_command_chained_after_the_separator(repo: Path) -> None:
+    # Arguments are allowed; a second command is not, and `--` does not launder one. Without this
+    # the separator would be the way around the rule rather than the way to satisfy it.
+    runs(repo, "pixi run -e test test -- --durations=10 && rm -rf dist")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["workflow-step-tasks"] == "FAIL"
+    assert "step 1 runs a command rather than `pixi run <task>`" in proc.stderr
+
+
 def test_rule_12_fires_on_a_multi_line_script(repo: Path) -> None:
     write(
         repo,

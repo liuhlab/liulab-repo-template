@@ -6,10 +6,13 @@
 # is the whole reason it is a job of its own.
 #
 # Every step invokes `pixi run <task>` and never a command line. The step list lives in
-# `pyproject.toml` — `check-static` names it once — so this file and a laptop cannot drift:
-# adding a step is one more word there and nothing here. This paragraph is the advice and
-# conformance rule `workflow-step-tasks` is the enforcement, over every workflow in the
-# repo and not only this one; they say one thing, so they change together.
+# `pyproject.toml` — `check-static` names it once — so adding a step is one more word
+# there and nothing here. Conformance rule `workflow-step-tasks` holds every workflow in
+# the repo to it, and what it checks is that the command came from the task table: a step
+# may pass arguments after `--`, and the rule prints them rather than forbidding them.
+# It reads the `run:` line only, so `env:`, `working-directory:`, `shell:` and a local
+# composite action can still make a step do something no `pixi run` does here. Keeping
+# CI and a laptop the same is a habit this file keeps, not a property anything proves.
 #
 # Not shipped, deliberately: a `claude.yml`, because on a public repo anyone who can
 # comment could spend the API budget; container and benchmark workflows, because nothing
