@@ -64,6 +64,9 @@ pyyaml = "*"
 
 [tool.pixi.feature.test.dependencies]
 pytest = "*"
+# Declared here too, not inherited: the tests run conformance, and a test environment shaped
+# differently from this one would import-error on every test.
+pyyaml = "*"
 
 # Exact: at 0.0.x nothing promises the next patch is compatible.
 [tool.pixi.feature.docs.dependencies]

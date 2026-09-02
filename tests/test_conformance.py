@@ -34,6 +34,13 @@ REPO = Path(__file__).resolve().parents[1]
 CONFORMANCE = REPO / "scripts" / "conformance.py"
 INSTALLER = REPO / "skills" / "install.py"
 
+# Rule 7 delegates to the installer above, and a repo that took `conformance.py` without the
+# skills lane ships none. There the rule is vacuous — `--`, with the note saying why — and the
+# tree it reports on has no skills to count. Every expectation that turns on this reads these two
+# names, so the module runs in such a repo instead of erroring in setup.
+SYMLINKS_STATUS = "ok" if INSTALLER.exists() else "--"
+SYMLINKS_NOTE = "1 skill" if INSTALLER.exists() else "not checked: no skills/install.py"
+
 # Spelled in two pieces for the same reason `conformance.py` spells it that way: `init-repo`
 # substitutes the placeholder through the whole tree and the dogfood job then greps a rendered
 # repo for it. A literal here would be rewritten, and would be found.
@@ -186,9 +193,11 @@ def repo(tmp_path: Path) -> Path:
     write(root, "docs/adr/0001-a-decision.md", f"{FRONT_MATTER}# A decision\n\nWe chose this.\n")
     write(root, "docs/research/a-note.md", f"{FRONT_MATTER}# A note\n\nWhat was found.\n")
     # The real installer, not a stand-in: rule 7 delegates to this file, so a copy of it is what
-    # makes the delegation the thing under test.
-    (root / "skills").mkdir(parents=True, exist_ok=True)
-    shutil.copy(INSTALLER, root / "skills" / "install.py")
+    # makes the delegation the thing under test. Conditional because a repo that has no installer
+    # to copy is exactly the repo rule 7 has to stay vacuous in.
+    if INSTALLER.exists():
+        (root / "skills").mkdir(parents=True, exist_ok=True)
+        shutil.copy(INSTALLER, root / "skills" / "install.py")
     subprocess.run(["git", "init", "-q"], cwd=root, check=True)
     return root
 
@@ -277,8 +286,8 @@ def test_a_tree_that_has_skills_passes_every_rule(repo: Path) -> None:
     verdicts = statuses(proc)
     assert verdicts["skill-file-location"] == "ok"
     assert verdicts["skill-name-prefix"] == "ok"
-    assert verdicts["skill-symlinks"] == "ok"
-    assert "1 skill" in proc.stdout
+    assert verdicts["skill-symlinks"] == SYMLINKS_STATUS
+    assert SYMLINKS_NOTE in flat(proc.stdout)
 
 
 # The exit status is a three-way answer and not a boolean, so all three are asserted here rather
@@ -470,17 +479,18 @@ def test_rule_5_fires_on_a_skill_file_the_installer_cannot_see(repo: Path) -> No
 
 
 def test_rule_6_fires_on_a_skill_that_shadows_the_shared_plugin(repo: Path) -> None:
-    # Correctly installed in both discovery paths, so rule 7 is green and the NAME is the only
-    # thing wrong — which is the point: this one is invisible to every other check.
+    # Correctly installed in both discovery paths, so rule 7 does not fail and the NAME is the
+    # only thing wrong — which is the point: this one is invisible to every other check.
     add_skill(repo, "lab-hpc")
     proc = conformance(repo)
     assert proc.returncode == 1
     verdicts = statuses(proc)
     assert verdicts["skill-name-prefix"] == "FAIL"
-    assert verdicts["skill-symlinks"] == "ok"
+    assert verdicts["skill-symlinks"] == SYMLINKS_STATUS
     assert "is a repo-local skill named `lab-hpc`" in proc.stderr
 
 
+@pytest.mark.skipif(not INSTALLER.exists(), reason="repo ships no skills/install.py")
 def test_rule_7_delegates_to_the_installer(repo: Path) -> None:
     # A skill with no symlinks. The assertion is not just that rule 7 fails but that the
     # installer's OWN report comes through, fix line included — proof the rule delegates rather
