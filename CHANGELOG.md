@@ -26,3 +26,7 @@ sets one.
   after this repo while the shipped config keeps the placeholder. Both are template-only:
   `init-repo` deletes them, takes `-f mkdocs.template.yml` off the two docs tasks, and cuts
   the front page's pointer at the page.
+- A `validation:` block in `mkdocs.yml` turning on the five link checks the site builder
+  ships switched off, and a comment beside it listing, from measurement, which broken links
+  a strict build catches and which three it lets through. A `nav:` entry naming a file that
+  is not there is one of the three, and no setting catches it.
