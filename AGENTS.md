@@ -10,7 +10,8 @@ wrong. Distribution name **`liulab-newpkg`**, import name **`newpkg`**.
 
 - **pixi** is the only supported toolchain. Never bare pip, uv, or conda. `pyproject.toml`
   is the single source of truth for dependencies, environments, and tasks.
-- **Python 3.13**, declared in exactly two places: `requires-python` and the pixi pin.
+- **Python 3.13**, declared by `requires-python` and the pixi pin. Write it anywhere else — a
+  ruff target, a pyright version — and `conformance` holds that copy to the floor.
 - **hatchling + hatch-vcs**. The version comes from the newest git tag, CalVer
   `vYYYY.M.PATCH`. Never hand-edit a version.
 - Platforms: `osx-arm64` and `linux-64`.

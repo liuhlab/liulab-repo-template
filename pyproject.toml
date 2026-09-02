@@ -45,7 +45,8 @@ platforms = ["osx-arm64", "linux-64"]
 [tool.pixi.pypi-dependencies]
 liulab-newpkg = { path = ".", editable = true }
 
-# Python is pinned here and nowhere else; `requires-python` is its only other mention.
+# The interpreter. `requires-python` is the floor, and conformance holds every other Python
+# version this repo declares to it.
 # Runtime dependencies are mirrored from `[project] dependencies` so pixi takes them from
 # conda-forge rather than PyPI.
 [tool.pixi.dependencies]

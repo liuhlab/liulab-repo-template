@@ -21,6 +21,10 @@ sets one.
   files, and tags `v0.0.0`. It asks first about anything you have already edited.
 - The `dogfood` job, which renders this template for all three shapes on every pull
   request and proves each new repo passes its own checks and builds its own site.
+- A conformance rule for the Python version. The pixi pin has to meet the
+  `requires-python` floor, and any tool that writes a language level down has to write that
+  floor. It checks that the declarations agree, and does not count them, so a repo that
+  supports a range of Python versions still passes.
 - `docs/template/index.md`, the page that says what the template ships and how to make a
   repo from it, and `mkdocs.template.yml`, which inherits `mkdocs.yml` and names the site
   after this repo while the shipped config keeps the placeholder. Both are template-only:
