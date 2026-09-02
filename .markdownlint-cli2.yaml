@@ -22,3 +22,9 @@ config:
   # matter of taste, and tables and long links routinely exceed any limit, so MD013 would
   # fire on every one of them.
   MD013: false
+  # Scoped, not disabled. A Keep a Changelog file gives every release the same section
+  # names, so `### Added` recurs once per release by design and the default fails a
+  # correct changelog on its SECOND release. `siblings_only` still fails one release
+  # repeating its own section, which is the duplicate that is a real mistake.
+  MD024:
+    siblings_only: true
