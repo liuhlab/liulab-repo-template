@@ -24,6 +24,12 @@ survives deletion without loss, delete it. The caps below are ceilings, not targ
 `conformance`, not by vale. A glossary grows one term at a time, so the file is the wrong
 unit to measure.
 
+**Measure with the gate, not with `wc`.** `wc -w` counts table pipes, link targets and
+shell flags as words; vale does not, and vale is what enforces the cap. The gap scales with
+markup — measured across this repo it runs from 10% on prose to 65% on a page that is mostly
+a table, so `wc` will tell you a reference page is near a cap it is nowhere near. Run
+`pixi run vale` and believe it.
+
 The caps are dials with tight defaults. Raising one is a one-line diff in `styles/Lab/` —
 do that deliberately, and say why in the commit message. Do not raise a cap because a
 document ran long; that is the cap working.
