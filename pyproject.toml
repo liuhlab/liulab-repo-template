@@ -157,8 +157,10 @@ reportMissingTypeStubs = "none"
 # ============================== pytest ==============================
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = ["-ra", "--strict-markers", "--strict-config"]
+# `src` is collected for its docstring examples alone: `--doctest-modules` runs them, so an
+# example that has drifted from the code it documents fails.
+testpaths = ["tests", "src"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--doctest-modules"]
 xfail_strict = true
 filterwarnings = ["error"]
 
