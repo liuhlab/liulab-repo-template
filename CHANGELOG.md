@@ -38,3 +38,7 @@ sets one.
 - Docstring examples as tests. `pytest` collects the doctests in `src/` alongside `tests/`,
   so an example that has drifted from the code it documents fails the gate. `docs/api.md`
   says how to mark a line that cannot run offline.
+- A `validation:` block in `mkdocs.yml` turning on the five link checks the site builder
+  ships switched off, and a comment beside it listing, from measurement, which broken links
+  a strict build catches and which three it lets through. A `nav:` entry naming a file that
+  is not there is one of the three, and no setting catches it.
