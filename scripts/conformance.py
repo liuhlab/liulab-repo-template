@@ -7,6 +7,13 @@
 It states the RULE, not the file contents — a pull model, so a repo that legitimately diverges
 stays green while the shared conventions stay checked. Fifteen rules: thirteen fail, two only warn.
 
+Three exit statuses, spelled the way `scripts/check.sh` spells its own: **0** every rule passed,
+**1** it ran and a rule failed, **2** it could not run at all — no `.git` to list tracked files
+from, no `pyproject.toml`, a manifest that will not parse. The last is not a repo that broke a
+rule, it is a repo nothing checked, and the two want opposite answers: fix the repo, or fix the
+invocation. One exit code for both sends whoever reads the log hunting a violation that is not
+there.
+
 Three things it does on purpose:
 
 - **It collects every failure.** One run tells you everything to fix, the same idiom
@@ -48,6 +55,23 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
+
+#: The three exit statuses, named so the contract is written once and read where it is returned.
+#: `CANNOT_RUN` is the one that says nothing about this repo's rules: `scripts/check.sh` already
+#: spells "could not run" as 2 — a usage error, a capture directory it could not make — and a
+#: checker that exited 1 for both would have every reader looking for a rule violation instead of
+#: for the missing checkout. `tests/test_conformance.py` asserts all three.
+PASSED, FAILED, CANNOT_RUN = 0, 1, 2
+
+
+class CannotRunError(Exception):
+    """The tree could not be read at all, so no rule was checked.
+
+    Raised by :func:`load` and turned into `CANNOT_RUN` by :func:`main`. It is deliberately not a
+    `SystemExit` carrying a message: Python prints such a message and exits **1**, which is the
+    status a failed rule already uses, and that is the conflation this class exists to remove.
+    """
+
 
 #: The template's placeholder module name, SPELLED IN TWO PIECES on purpose. `init-repo`
 #: substitutes that name throughout the tree and the dogfood job then greps a rendered repo for
@@ -1529,7 +1553,12 @@ WAIVER_RULE = (15, "waivers")
 
 
 def load(root: Path) -> Repo:
-    """Read the tree and the declarations, or explain why that was not possible."""
+    """Read the tree and the declarations, or raise :class:`CannotRunError` saying why not.
+
+    Every condition here is the same one: the inputs every rule reads are not there, so the answer
+    is unknown rather than bad. None of them is a rule this repo broke, and :func:`main` gives them
+    all `CANNOT_RUN` for that reason.
+    """
     proc = subprocess.run(
         ["git", "-C", str(root), "ls-files", "-z"],
         capture_output=True,
@@ -1537,12 +1566,18 @@ def load(root: Path) -> Repo:
         check=False,
     )
     if proc.returncode != 0:
-        raise SystemExit(f"conformance: cannot list tracked files in {root}\n{proc.stderr.strip()}")
+        raise CannotRunError(f"cannot list tracked files in {root}\n{proc.stderr.strip()}")
     tracked = tuple(sorted(p for p in proc.stdout.split("\0") if p))
     pyproject = root / "pyproject.toml"
     if not pyproject.is_file():
-        raise SystemExit(f"conformance: no pyproject.toml in {root}")
-    tool = tomllib.loads(pyproject.read_text(encoding="utf-8")).get("tool", {})
+        raise CannotRunError(f"no pyproject.toml in {root}")
+    try:
+        parsed = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as reason:
+        # A manifest nothing can parse is the declarations MISSING, not a rule broken — and a
+        # traceback here would exit 1, reading as a failed rule with an unusually bad report.
+        raise CannotRunError(f"cannot read pyproject.toml in {root}\n{reason}") from reason
+    tool = parsed.get("tool", {})
     liulab = tool.get("liulab", {})
     return Repo(
         root=root,
@@ -1640,7 +1675,7 @@ def report(repo: Repo, results: list[tuple[Rule, Result]]) -> int:
     total = sum(1 for rule, _ in results if not rule.warns_only)
     if not failed:
         print(f"\nAll {total} rules pass.")
-        return 0
+        return PASSED
     # Flushed before the first byte reaches stderr. `check.sh` captures both streams into one
     # file, where stdout is block-buffered and stderr is not, so without this the failures print
     # above the table that says which rules they came from.
@@ -1654,11 +1689,15 @@ def report(repo: Repo, results: list[tuple[Rule, Result]]) -> int:
         for problem in result.problems:
             print(textwrap.indent(problem, "  "), file=sys.stderr)
         print("", file=sys.stderr)
-    return 1
+    return FAILED
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run every rule against one tree and report."""
+    """Run every rule against one tree and report, returning the exit status.
+
+    `PASSED` or `FAILED` once the rules have run, and `CANNOT_RUN` when :func:`load` says the tree
+    could not be read — the one answer that is about the invocation and not about the repo.
+    """
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1670,7 +1709,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Repository to check. Defaults to the repo this script lives in.",
     )
     args = parser.parse_args(argv)
-    repo = load(args.root.resolve())
+    try:
+        repo = load(args.root.resolve())
+    except CannotRunError as reason:
+        print(f"conformance: {reason}", file=sys.stderr)
+        print("conformance: nothing was checked. This is not a rule failure.", file=sys.stderr)
+        return CANNOT_RUN
     results = [(rule, rule.check(repo)) for rule in RULES]
     return report(repo, results)
 

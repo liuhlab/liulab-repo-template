@@ -10,6 +10,10 @@ marks THAT rule FAIL and names the offending file. The rule name alone would pro
 status table prints all fifteen names on every run, passing or failing, so the assertions read the
 status word out of the table rather than grepping the output for a name.
 
+The exit status is checked here too, all three of it: 0, 1 when a rule failed, and 2 when the
+checker could not run at all. A checker that could not run has checked nothing, and it must not
+report that as a rule this repo broke.
+
 Conformance is invoked as a SUBPROCESS, so what is under test is the command an agent runs and
 CI runs, not an internal function that could be refactored into something the command no longer
 calls.
@@ -17,6 +21,7 @@ calls.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -188,19 +193,32 @@ def repo(tmp_path: Path) -> Path:
     return root
 
 
-def conformance(root: Path) -> subprocess.CompletedProcess[str]:
+def conformance(
+    root: Path, *, stage: bool = True, ceiling: Path | None = None
+) -> subprocess.CompletedProcess[str]:
     """Run the checker over one tree, the way a person and CI run it.
 
     `git add -A` first, because every rule reads `git ls-files`: until a fixture's edit is staged
     it does not exist as far as conformance is concerned. Nothing is committed — no rule reads
-    history, and a commit would need an identity this environment may not have.
+    history, and a commit would need an identity this environment may not have. `stage=False` is
+    for the one tree that is not a repo at all, where there is nothing to stage into.
+
+    `ceiling` is what makes such a tree genuinely repo-less. `git ls-files` walks UP from its
+    working directory, so a scratch directory inherits whatever repository happens to be above it —
+    and a test that relied on the temporary directory sitting outside one would pass or fail on
+    where the machine puts its temporary files. `GIT_CEILING_DIRECTORIES` stops the walk there.
     """
-    subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+    if stage:
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+    env = dict(os.environ)
+    if ceiling is not None:
+        env["GIT_CEILING_DIRECTORIES"] = str(ceiling)
     return subprocess.run(
         [sys.executable, str(CONFORMANCE), "--root", str(root)],
         capture_output=True,
         text=True,
         check=False,
+        env=env,
     )
 
 
@@ -261,6 +279,57 @@ def test_a_tree_that_has_skills_passes_every_rule(repo: Path) -> None:
     assert verdicts["skill-name-prefix"] == "ok"
     assert verdicts["skill-symlinks"] == "ok"
     assert "1 skill" in proc.stdout
+
+
+# The exit status is a three-way answer and not a boolean, so all three are asserted here rather
+# than left implied by the rule tests below. "A rule failed" means fix the repo; "could not run"
+# means the checker never ran and the repo was never checked, and one status for both sends the
+# reader of a CI log hunting a violation that does not exist. 2 is the same word
+# `scripts/check.sh` uses for a usage error and for a capture directory it could not make.
+
+
+def test_it_exits_0_when_it_ran_and_every_rule_passed(repo: Path) -> None:
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "All 13 rules pass." in proc.stdout
+
+
+def test_it_exits_1_when_it_ran_and_a_rule_failed(repo: Path) -> None:
+    write(repo, "README.md", f"# liulab-{PLACEHOLDER}\n\nA repo that was never renamed.\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert "1 of 13 rules failed" in proc.stderr
+
+
+def test_it_exits_2_when_there_is_no_git_to_list_tracked_files_from(tmp_path: Path) -> None:
+    # Every rule reads `git ls-files`, so without a repository NOTHING was checked — the state CI
+    # would be in given a source archive instead of a checkout. The tree is otherwise complete, so
+    # the missing `.git` is the only thing under test.
+    plain = tmp_path / "plain"
+    write(plain, "pyproject.toml", PYPROJECT)
+    proc = conformance(plain, stage=False, ceiling=tmp_path)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert "cannot list tracked files" in proc.stderr
+    assert "not a rule failure" in proc.stderr
+
+
+def test_it_exits_2_when_there_is_no_pyproject_toml(repo: Path) -> None:
+    # The declarations every rule reads about themselves live there — the agent-docs table, the
+    # waivers, the task list. Without it the answer is unknown, not bad.
+    (repo / "pyproject.toml").unlink()
+    proc = conformance(repo)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert "no pyproject.toml" in proc.stderr
+
+
+def test_it_exits_2_when_the_manifest_will_not_parse(repo: Path) -> None:
+    # Same class as an absent manifest, and it must not be a traceback: an uncaught exception exits
+    # 1, which would read as a failed rule with an unusually bad report.
+    write(repo, "pyproject.toml", "[project\nname = 'example'\n")
+    proc = conformance(repo)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert "cannot read pyproject.toml" in proc.stderr
+    assert "Traceback" not in proc.stderr
 
 
 def test_rule_1_fires_on_a_tracked_placeholder(repo: Path) -> None:
