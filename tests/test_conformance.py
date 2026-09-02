@@ -728,70 +728,101 @@ def test_every_failure_is_reported_and_not_just_the_first(repo: Path) -> None:
     assert "3 of 13 rules failed" in proc.stderr
 
 
-def test_rule_10_fires_on_a_pre_commit_configuration(repo: Path) -> None:
-    write(repo, ".pre-commit-config.yaml", "repos:\n  - repo: local\n    hooks: []\n")
+@pytest.mark.parametrize(
+    ("rel", "tool"),
+    [
+        ("poetry.lock", "poetry"),
+        ("uv.lock", "uv"),
+        ("pdm.lock", "pdm"),
+        ("Pipfile", "pipenv"),
+        ("Pipfile.lock", "pipenv"),
+    ],
+)
+def test_rule_10_fires_on_a_competing_resolvers_artifact(repo: Path, rel: str, tool: str) -> None:
+    write(repo, rel, "# resolved elsewhere\n")
     proc = conformance(repo)
     assert proc.returncode == 1
     assert statuses(proc)["single-toolchain"] == "FAIL"
-    assert ".pre-commit-config.yaml declares dependencies for pre-commit" in proc.stderr
+    assert f"{rel} belongs to {tool}, a resolver other than pixi" in proc.stderr
     assert "pyproject.toml is the single source of truth" in flat(proc.stderr)
 
 
-def test_rule_10_fires_on_a_requirements_file(repo: Path) -> None:
-    # Not `requirements.txt`: the marker covers the family, and a rule written for the one
-    # spelling one repo happened to use would pass this tree.
-    write(repo, "requirements-dev.txt", "ruff==0.6.0\n")
+def test_rule_10_fires_on_a_competing_resolvers_artifact_in_a_subdirectory(repo: Path) -> None:
+    # UN-ANCHORED, and that is the rule: `env/uv.lock` resolves the same environment `uv.lock`
+    # does. Anchoring at the root would have made `git mv` the fix and taught people to hide the
+    # thing the rule exists to find.
+    write(repo, "env/uv.lock", "version = 1\n")
     proc = conformance(repo)
     assert proc.returncode == 1
     assert statuses(proc)["single-toolchain"] == "FAIL"
-    assert "requirements-dev.txt declares dependencies for pip" in proc.stderr
+    assert "env/uv.lock belongs to uv" in proc.stderr
 
 
-def test_rule_10_fires_on_a_conda_environment_file(repo: Path) -> None:
-    write(repo, "environment.yml", "name: example\ndependencies:\n  - python=3.13\n")
-    proc = conformance(repo)
-    assert proc.returncode == 1
-    assert statuses(proc)["single-toolchain"] == "FAIL"
-    assert "environment.yml declares dependencies for conda" in proc.stderr
-
-
-def test_rule_10_fires_on_a_second_build_backends_dependency_section(repo: Path) -> None:
-    # No file of its own: the versions are a table in the same manifest, which is the shape a
+@pytest.mark.parametrize("table", ["tool.poetry", "tool.uv", "tool.pdm"])
+def test_rule_10_fires_on_a_competing_resolvers_table(repo: Path, table: str) -> None:
+    # No file of its own: the resolver is configured in the same manifest, which is the shape a
     # rule that only looked at filenames would miss.
-    write(repo, "pyproject.toml", PYPROJECT + '\n[tool.poetry.dependencies]\nrequests = "*"\n')
+    write(repo, "pyproject.toml", PYPROJECT + f"\n[{table}]\nmanaged = true\n")
     proc = conformance(repo)
     assert proc.returncode == 1
     assert statuses(proc)["single-toolchain"] == "FAIL"
-    assert "pyproject.toml has [tool.poetry], which configures poetry" in proc.stderr
+    assert f"pyproject.toml has [{table}], which configures" in proc.stderr
 
 
-def test_rule_10_fires_on_another_resolvers_lockfile(repo: Path) -> None:
-    write(repo, "uv.lock", "version = 1\n")
-    proc = conformance(repo)
-    assert proc.returncode == 1
-    assert statuses(proc)["single-toolchain"] == "FAIL"
-    assert "uv.lock declares dependencies for uv" in proc.stderr
-
-
-def test_rule_10_leaves_the_pixi_lock_and_a_fixture_alone(repo: Path) -> None:
-    # `pixi.lock` is the lock this rule protects, and a requirements file BELOW the root is some
-    # test's input, not this repo's dependencies. Markers are named per tool and root-anchored so
-    # that neither of these is a failure.
-    write(repo, "pixi.lock", "version: 6\n")
-    write(repo, "tests/fixtures/requirements.txt", "requests==2.0.0\n")
+@pytest.mark.parametrize(
+    "rel",
+    [
+        # A notebook a researcher runs on Colab, which cannot run pixi as its kernel.
+        "requirements.txt",
+        "requirements-frozen.txt",
+        # How a repo ships a runnable notebook, byte-identical wherever it sits.
+        "environment.yml",
+        "binder/environment.yml",
+        # Builds a C extension and declares no dependency at all.
+        "setup.py",
+    ],
+)
+def test_rule_10_leaves_correct_work_alone(repo: Path, rel: str) -> None:
+    # Every one of these was measured failing the wider rule, which told the author to delete the
+    # file and declare it in a conda table their notebook cannot see. A measurement outranks the
+    # defect a wider marker might also have caught.
+    write(repo, rel, "scanpy==1.10\n")
     proc = conformance(repo)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert statuses(proc)["single-toolchain"] == "ok"
 
 
-def test_rule_10_says_which_second_toolchains_it_looked_for(repo: Path) -> None:
+def test_rule_10_leaves_a_pre_commit_hook_alone(repo: Path) -> None:
+    # Dropped rather than narrowed. pre-commit is a hook runner, not a resolver, and the shape a
+    # Liu Lab repo would write pins nothing and REMOVES the drift the rule names.
+    write(
+        repo,
+        ".pre-commit-config.yaml",
+        "repos:\n  - repo: local\n    hooks:\n      - id: lint\n        name: lint\n"
+        "        language: system\n        entry: pixi run lint\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["single-toolchain"] == "ok"
+
+
+def test_rule_10_leaves_the_pixi_lock_alone(repo: Path) -> None:
+    # `pixi.lock` is the lock this rule protects, so markers are named per resolver and never
+    # `*.lock`.
+    write(repo, "pixi.lock", "version: 6\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["single-toolchain"] == "ok"
+
+
+def test_rule_10_says_which_resolvers_it_looked_for(repo: Path) -> None:
     # This rule can never be vacuous, so it never prints `--`. It still has to say what it knew
     # to look for, or its green means only that nothing on an unstated list was found.
     proc = conformance(repo)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert statuses(proc)["single-toolchain"] == "ok"
-    assert "8 second toolchain(s) looked for" in flat(proc.stdout)
-    assert "pre-commit, pip, conda, pipenv, setuptools, poetry, uv, pdm" in flat(proc.stdout)
+    assert "4 competing resolver(s) looked for anywhere in" in flat(proc.stdout)
+    assert "poetry, uv, pdm, pipenv" in flat(proc.stdout)
 
 
 def pyproject_python(

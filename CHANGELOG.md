@@ -26,6 +26,10 @@ sets one.
 - A conformance rule that fails a publishing workflow a tag push can trigger, and the
   workflow reader it is built on: the check now parses every workflow file, its triggers
   and its steps, instead of only reading text.
+- A conformance rule that fails a repo where a second resolver has been set up: a
+  `poetry.lock`, `uv.lock`, `pdm.lock` or `Pipfile` anywhere in the tree, or a `[tool.poetry]`,
+  `[tool.uv]` or `[tool.pdm]` table in `pyproject.toml`. Two resolvers can disagree quietly,
+  and what one of them installs is not what the gate runs in.
 - A conformance rule for the Python version. The pixi pin has to meet the
   `requires-python` floor, and any tool that writes a language level down has to write that
   floor. It checks that the declarations agree, and does not count them, so a repo that
@@ -58,6 +62,13 @@ sets one.
 
 ### Changed
 
+- The conformance rule about a second resolver now looks for four things instead of eight: a
+  `poetry.lock`, `uv.lock`, `pdm.lock` or `Pipfile`, and the three tables that configure those
+  resolvers. It no longer says anything about `requirements.txt`, `environment.yml`, `setup.py`
+  or `.pre-commit-config.yaml`, each of which was measured failing a repo doing correct work —
+  a notebook that runs on Colab needs a requirements file and cannot run pixi, and the old
+  advice was to delete it. The four that remain are files a resolver writes for itself, and
+  they now fail wherever they sit rather than only at the top of the repo.
 - The conformance rule about the publishing trigger now reads a tag filter instead of refusing
   every one. A `push:` with no branch filter and a `create:` still fail, because an absent
   filter is every ref and neither has a correct form. A `tags:` or `tags-ignore:` filter is

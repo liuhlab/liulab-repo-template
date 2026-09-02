@@ -170,45 +170,51 @@ _SKILL_DIR_RES = (
 
 @dataclass(frozen=True)
 class SecondToolchain:
-    """One toolchain other than pixi, and where it would declare a dependency version.
+    """One resolver other than pixi, and where it leaves the environment it resolved.
 
     Attributes
     ----------
     tool
         The tool named in the failure, and listed in the note that says what was looked for.
-    path
-        A regex FULL-matched against a repo-relative tracked path. A pattern with no `/` in it
-        therefore matches at the repo root and nowhere else, which is where a resolver reads:
-        `tests/fixtures/requirements.txt` is a test's input, not this repo's dependencies.
+    name
+        A regex FULL-matched against a tracked path's FILE NAME, so a marker is found wherever
+        it sits. Un-anchored on purpose: `env/poetry.lock` resolves the same environment
+        `poetry.lock` does, and anchoring at the root would have made `git mv` the fix.
     table
-        A dotted table in `pyproject.toml`, for a tool that declares versions in the manifest
-        instead of a file of its own — a second build backend's dependency section.
+        A dotted table in `pyproject.toml`, for a resolver configured in the manifest rather
+        than in a file of its own.
     """
 
     tool: str
-    path: str = ""
+    name: str = ""
     table: str = ""
 
 
-#: Every second place a dependency version can be declared. Rule 10 reads this and nothing else,
-#: so covering one more tool is one more line here.
+#: Every marker of a second resolver. Rule 10 reads this and nothing else, so covering one more
+#: resolver is one more line here.
 #:
 #: It is a constant and not a `[tool.liulab.*]` key because it is not a claim a repo makes about
 #: itself: the rule is the same in every Liu Lab repo, and a repo that must keep one of these has
 #: `[tool.liulab.waived]`, which is printed on every run. A manifest list could be emptied
 #: instead, and an escape hatch nobody can see is the thing this file exists to prevent.
 #:
-#: Lockfiles are named per tool, never `*.lock`: `pixi.lock` is the lock this rule protects.
-#: `setup.cfg` is absent because it commonly carries only tool configuration and no dependency.
+#: One category and nothing wider: a competing resolver's GENERATED artifact, or the table that
+#: configures it. Each has no legitimate form, no human reader, and no sensible use in a
+#: subdirectory. Lockfiles are named per tool, never `*.lock`, because `pixi.lock` is the lock
+#: this rule protects.
+#:
+#: Four markers were measured firing on correct work and are gone. `requirements.txt`, because a
+#: notebook a researcher runs on Colab needs one and cannot run pixi. `environment.yml`, because
+#: `binder/environment.yml` is how a repo ships a runnable notebook. `setup.py`, because it
+#: builds C extensions while declaring no dependency at all. `.pre-commit-config.yaml`, because
+#: the hook shape a Liu Lab repo would write — `language: system`, `entry: pixi run lint` — pins
+#: nothing and is the pattern that REMOVES the drift this rule names. Telling a researcher to
+#: delete any of them is advice that breaks working science.
 SECOND_TOOLCHAINS: tuple[SecondToolchain, ...] = (
-    SecondToolchain("pre-commit", path=r"\.pre-commit-config\.ya?ml"),
-    SecondToolchain("pip", path=r"[^/]*requirements[^/]*\.txt|requirements/[^/]+\.txt"),
-    SecondToolchain("conda", path=r"[^/]*environment[^/]*\.ya?ml"),
-    SecondToolchain("pipenv", path=r"Pipfile(\.lock)?"),
-    SecondToolchain("setuptools", path=r"setup\.py"),
-    SecondToolchain("poetry", path=r"poetry\.lock", table="tool.poetry"),
-    SecondToolchain("uv", path=r"uv\.lock", table="tool.uv"),
-    SecondToolchain("pdm", path=r"pdm\.lock", table="tool.pdm"),
+    SecondToolchain("poetry", name=r"poetry\.lock", table="tool.poetry"),
+    SecondToolchain("uv", name=r"uv\.lock", table="tool.uv"),
+    SecondToolchain("pdm", name=r"pdm\.lock", table="tool.pdm"),
+    SecondToolchain("pipenv", name=r"Pipfile(\.lock)?"),
 )
 
 
@@ -1203,22 +1209,34 @@ def rule_release_trigger(repo: Repo) -> Result:
 
 
 def rule_single_toolchain(repo: Repo) -> Result:
-    """10. No second toolchain is configured: pixi and the manifest are the only ones."""
+    """10. No competing resolver has been run here: pixi and the manifest are the only ones.
+
+    A LOCKFILE or a resolver's table, and nothing wider. The rule was cut back to that category
+    after four of its eight markers were measured firing on correct work — a Colab notebook's
+    `requirements.txt`, a `binder/environment.yml`, a `setup.py` that builds a C extension and
+    declares no dependency, and a pre-commit hook that only invokes `pixi run`. Each of those is
+    a file someone reads or a build someone needs, and the rule's advice for all four was to
+    delete it.
+
+    It says nothing about a root `requirements.txt` any more, not even a warning. A researcher
+    whose notebook runs on Colab needs that file, cannot run pixi as the kernel, and would get
+    nothing from being told about it on every run.
+    """
     result = Result()
     # One why for every marker, because it is one failure: the class, not the tool.
     why = (
-        "two resolvers can disagree, and it fails silently rather than loudly: a version "
-        "declared here is one `pixi.lock` never sees, so an environment built from it and the "
-        "environment the gate runs in differ while both look correct. pyproject.toml is the "
-        "single source of truth for dependencies, environments and tasks"
+        "a second resolver is set up to build this repo's environment, and it resolves against "
+        "its own inputs: what it installs and what the gate runs in can differ while both look "
+        "correct, and nothing reports it. pyproject.toml is the single source of truth for "
+        "dependencies, environments and tasks, and pixi.lock is the only lock read here"
     )
     for marker in SECOND_TOOLCHAINS:
-        if marker.path:
+        if marker.name:
             for rel in repo.tracked:
-                if re.fullmatch(marker.path, rel):
+                if re.fullmatch(marker.name, PurePosixPath(rel).name):
                     result.problems.append(
                         _problem(
-                            f"{rel} declares dependencies for {marker.tool}, a second toolchain",
+                            f"{rel} belongs to {marker.tool}, a resolver other than pixi",
                             why,
                             f"delete {rel} and declare what it pinned in pyproject.toml — "
                             "`[tool.pixi.dependencies]` for a package, `[tool.pixi.tasks]` for a "
@@ -1235,11 +1253,11 @@ def rule_single_toolchain(repo: Repo) -> Result:
                 )
             )
     # This rule is never vacuous — the list is always there and so is the manifest — but a run
-    # still has to say WHICH second toolchains it knew to look for, or a green means nothing.
+    # still has to say WHICH resolvers it knew to look for, or a green means nothing.
     names = ", ".join(marker.tool for marker in SECOND_TOOLCHAINS)
     result.notes.append(
-        f"{len(SECOND_TOOLCHAINS)} second toolchain(s) looked for across "
-        f"{len(repo.tracked)} tracked path(s) and pyproject.toml: {names}"
+        f"{len(SECOND_TOOLCHAINS)} competing resolver(s) looked for anywhere in "
+        f"{len(repo.tracked)} tracked path(s) and in pyproject.toml: {names}"
     )
     return result
 
@@ -1570,8 +1588,9 @@ RULES: tuple[Rule, ...] = (
     Rule(
         10,
         "single-toolchain",
-        "no second toolchain is configured — no pre-commit config, requirements file, conda "
-        "environment or foreign resolver's table declares a version the pixi lock never sees",
+        "no competing resolver is set up here — no poetry.lock, uv.lock, pdm.lock or Pipfile "
+        "anywhere in the tree, and no [tool.poetry], [tool.uv] or [tool.pdm] in pyproject.toml. "
+        "A generated artifact of another resolver, and nothing a person reads or writes",
         rule_single_toolchain,
     ),
     Rule(
