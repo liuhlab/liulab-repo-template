@@ -30,6 +30,9 @@ sets one.
   `requires-python` floor, and any tool that writes a language level down has to write that
   floor. It checks that the declarations agree, and does not count them, so a repo that
   supports a range of Python versions still passes.
+- A conformance rule that fails a workflow step running a command of its own instead of
+  `pixi run <task>`, or naming a task nothing declares. The step list stays in one place,
+  so what CI runs and what your laptop runs cannot quietly stop being the same thing.
 - `docs/template/index.md`, the page that says what the template ships and how to make a
   repo from it, and `mkdocs.template.yml`, which inherits `mkdocs.yml` and names the site
   after this repo while the shipped config keeps the placeholder. Both are template-only:
