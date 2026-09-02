@@ -7,7 +7,7 @@ checked by no rule at all, with zero alerts and green CI. So the claim these tes
 
 Every test builds a tmp_path tree that is correct in every respect but one, and asserts the run
 marks THAT rule FAIL and names the offending file. The rule name alone would prove nothing: the
-status table prints all ten names on every run, passing or failing, so the assertions read the
+status table prints all eleven names on every run, passing or failing, so the assertions read the
 status word out of the table rather than grepping the output for a name.
 
 Conformance is invoked as a SUBPROCESS, so what is under test is the command an agent runs and
@@ -157,7 +157,7 @@ def statuses(proc: subprocess.CompletedProcess[str]) -> dict[str, str]:
     """The verdict the run gave each rule, read off its own status table.
 
     Asserting on the status word rather than on the presence of a rule NAME is the point: the
-    table prints all ten names on every run, so `"repo-shape" in output` is true of a green run
+    table prints all eleven names on every run, so `"repo-shape" in output` is true of a green run
     and would prove nothing at all.
     """
     found: dict[str, str] = {}
@@ -187,6 +187,7 @@ def test_the_fixture_tree_passes_every_rule(repo: Path) -> None:
         "skill-symlinks",
         "repo-shape",
         "init-sentinel",
+        "single-toolchain",
         "waivers",
     }
     assert verdicts["placeholder-rename"] == "ok"  # live, not gated off
@@ -248,7 +249,7 @@ def test_rule_1_refuses_to_be_waived(repo: Path) -> None:
     assert proc.returncode == 1
     assert statuses(proc)["placeholder-rename"] == "FAIL"
     assert "cannot be waived" in proc.stderr
-    assert "REFUSED" in proc.stdout  # and warning 10 still prints it
+    assert "REFUSED" in proc.stdout  # and warning 11 still prints it
 
 
 def test_rule_2_fires_on_a_page_that_is_not_excluded_from_search(repo: Path) -> None:
@@ -434,7 +435,7 @@ def test_a_waiver_suppresses_its_rule_and_is_still_printed(repo: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert statuses(proc)["glossary-entry-length"] == "waived"
     assert f"1 problem(s) suppressed: {reason}" in flat(proc.stdout)
-    # and warning 10 prints it a second time, in the waiver table
+    # and warning 11 prints it a second time, in the waiver table
     assert f"glossary-entry-length: 1 problem(s) suppressed — {reason}" in flat(proc.stdout)
 
 
@@ -467,4 +468,70 @@ def test_every_failure_is_reported_and_not_just_the_first(repo: Path) -> None:
     assert verdicts["agent-docs-unpublished"] == "FAIL"
     assert verdicts["skill-file-location"] == "FAIL"
     assert verdicts["repo-shape"] == "FAIL"
-    assert "3 of 8 rules failed" in proc.stderr
+    assert "3 of 9 rules failed" in proc.stderr
+
+
+def test_rule_10_fires_on_a_pre_commit_configuration(repo: Path) -> None:
+    write(repo, ".pre-commit-config.yaml", "repos:\n  - repo: local\n    hooks: []\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["single-toolchain"] == "FAIL"
+    assert ".pre-commit-config.yaml declares dependencies for pre-commit" in proc.stderr
+    assert "pyproject.toml is the single source of truth" in flat(proc.stderr)
+
+
+def test_rule_10_fires_on_a_requirements_file(repo: Path) -> None:
+    # Not `requirements.txt`: the marker covers the family, and a rule written for the one
+    # spelling one repo happened to use would pass this tree.
+    write(repo, "requirements-dev.txt", "ruff==0.6.0\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["single-toolchain"] == "FAIL"
+    assert "requirements-dev.txt declares dependencies for pip" in proc.stderr
+
+
+def test_rule_10_fires_on_a_conda_environment_file(repo: Path) -> None:
+    write(repo, "environment.yml", "name: example\ndependencies:\n  - python=3.13\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["single-toolchain"] == "FAIL"
+    assert "environment.yml declares dependencies for conda" in proc.stderr
+
+
+def test_rule_10_fires_on_a_second_build_backends_dependency_section(repo: Path) -> None:
+    # No file of its own: the versions are a table in the same manifest, which is the shape a
+    # rule that only looked at filenames would miss.
+    write(repo, "pyproject.toml", PYPROJECT + '\n[tool.poetry.dependencies]\nrequests = "*"\n')
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["single-toolchain"] == "FAIL"
+    assert "pyproject.toml has [tool.poetry], which configures poetry" in proc.stderr
+
+
+def test_rule_10_fires_on_another_resolvers_lockfile(repo: Path) -> None:
+    write(repo, "uv.lock", "version = 1\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["single-toolchain"] == "FAIL"
+    assert "uv.lock declares dependencies for uv" in proc.stderr
+
+
+def test_rule_10_leaves_the_pixi_lock_and_a_fixture_alone(repo: Path) -> None:
+    # `pixi.lock` is the lock this rule protects, and a requirements file BELOW the root is some
+    # test's input, not this repo's dependencies. Markers are named per tool and root-anchored so
+    # that neither of these is a failure.
+    write(repo, "pixi.lock", "version: 6\n")
+    write(repo, "tests/fixtures/requirements.txt", "requests==2.0.0\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["single-toolchain"] == "ok"
+
+
+def test_rule_10_says_which_second_toolchains_it_looked_for(repo: Path) -> None:
+    # This rule can never be vacuous, so it never prints `--`. It still has to say what it knew
+    # to look for, or its green means only that nothing on an unstated list was found.
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["single-toolchain"] == "ok"
+    assert "8 second toolchain(s) looked for" in flat(proc.stdout)
+    assert "pre-commit, pip, conda, pipenv, setuptools, poetry, uv, pdm" in flat(proc.stdout)
