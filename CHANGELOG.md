@@ -50,3 +50,8 @@ sets one.
   have noticed a repo dropping it. Its sibling `reportUnknownParameterType` was considered
   and declined: it also fails parameters that *are* annotated when the type belongs to an
   untyped dependency, which is not a bar a lab repo can hold.
+- A conformance rule that fails a `nav:` entry naming a file the repo does not track, or one
+  that sits outside the site source. That is the broken site the builder does not validate
+  at all — it reports no issues, exits 0, and publishes a menu item that 404s — so the check
+  had to go somewhere it could be one. It reads every site config, so a repo building more
+  than one site from one docs tree has both navs checked.

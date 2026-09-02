@@ -7,7 +7,7 @@ checked by no rule at all, with zero alerts and green CI. So the claim these tes
 
 Every test builds a tmp_path tree that is correct in every respect but one, and asserts the run
 marks THAT rule FAIL and names the offending file. The rule name alone would prove nothing: the
-status table prints all fourteen names on every run, passing or failing, so the assertions read the
+status table prints all fifteen names on every run, passing or failing, so the assertions read the
 status word out of the table rather than grepping the output for a name.
 
 Conformance is invoked as a SUBPROCESS, so what is under test is the command an agent runs and
@@ -115,7 +115,7 @@ def publishes(root: Path, on: str) -> None:
 
     The body is a real job with real steps, not a bare `on:` block: the accessor the rule reads
     parses the whole file, and a fixture that carried triggers alone would never exercise that.
-    Its one command invokes `build`, which `PYPROJECT` declares, so rule 11 stays green here and
+    Its one command invokes `build`, which `PYPROJECT` declares, so rule 12 stays green here and
     rule 9 is the only thing these trees vary.
     """
     write(
@@ -135,7 +135,7 @@ def publishes(root: Path, on: str) -> None:
 def runs(root: Path, *commands: str, job: str = "check") -> None:
     """A `ci.yml` whose one job checks out an action and then runs each command given.
 
-    Not `release.yml`: that path is rule 9's premise and rule 8's, and a rule 11 fixture must vary
+    Not `release.yml`: that path is rule 9's premise and rule 8's, and a rule 12 fixture must vary
     nothing but the commands. The leading `uses:` step is in every tree here on purpose — it is
     what proves an action step is passed over rather than merely absent.
     """
@@ -166,7 +166,7 @@ def repo(tmp_path: Path) -> Path:
 
     It has no `src/`, no workflow at all and so no release workflow, so rule 8's two conditionals,
     rule 9 and rule 11 are all vacuous here; the tests that care add the premise, through
-    `publishes` and `runs`. It has no `skills/init-repo/`, so rule 1 and warning 12 are both live
+    `publishes` and `runs`. It has no `skills/init-repo/`, so rule 1 and warning 14 are both live
     — the state a derived repo is in, and the only state where they check anything.
     """
     root = tmp_path / "repo"
@@ -208,7 +208,7 @@ def statuses(proc: subprocess.CompletedProcess[str]) -> dict[str, str]:
     """The verdict the run gave each rule, read off its own status table.
 
     Asserting on the status word rather than on the presence of a rule NAME is the point: the
-    table prints all fourteen names on every run, so `"repo-shape" in output` is true of a green run
+    table prints all fifteen names on every run, so `"repo-shape" in output` is true of a green run
     and would prove nothing at all.
     """
     found: dict[str, str] = {}
@@ -241,6 +241,7 @@ def test_the_fixture_tree_passes_every_rule(repo: Path) -> None:
         "single-toolchain",
         "python-version-agreement",
         "workflow-step-tasks",
+        "nav-target-exists",
         "init-sentinel",
         "waivers",
     }
@@ -283,7 +284,7 @@ def test_rule_1_fires_on_a_placeholder_in_a_path_not_only_in_a_file(repo: Path) 
 
 def test_rule_1_is_not_checked_while_the_init_skill_is_there(repo: Path) -> None:
     # The template ships the placeholder ON PURPOSE, and `skills/init-repo/` is what says the
-    # rename has not happened yet. Same discriminator warning 11 uses.
+    # rename has not happened yet. Same discriminator warning 14 uses.
     write(repo, "README.md", f"# liulab-{PLACEHOLDER}\n\nStill the template.\n")
     add_skill(repo, "init-repo")
     proc = conformance(repo)
@@ -303,7 +304,7 @@ def test_rule_1_refuses_to_be_waived(repo: Path) -> None:
     assert proc.returncode == 1
     assert statuses(proc)["placeholder-rename"] == "FAIL"
     assert "cannot be waived" in proc.stderr
-    assert "REFUSED" in proc.stdout  # and warning 13 still prints it
+    assert "REFUSED" in proc.stdout  # and the waiver table still prints it
 
 
 def test_rule_2_fires_on_a_page_that_is_not_excluded_from_search(repo: Path) -> None:
@@ -332,6 +333,9 @@ def test_rule_2_follows_a_docs_dir_the_site_moved(repo: Path) -> None:
     write(
         repo, "mkdocs.yml", "site_name: example\ndocs_dir: site-source\nnav:\n  - Home: index.md\n"
     )
+    # The page the moved nav names, so rule 13 is green here and rule 2 is the only rule this
+    # tree is about.
+    write(repo, "site-source/index.md", "# example\n\nThe front page.\n")
     proc = conformance(repo)
     # Nothing under `site-source/` is declared agent-facing, so the rule has nothing to check —
     # and says so, rather than reporting a green it did not earn.
@@ -516,7 +520,7 @@ def test_rule_9_is_vacuous_and_not_passing_when_the_repo_publishes_nothing(repo:
     )
 
 
-def test_warning_12_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> None:
+def test_warning_14_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> None:
     write(
         repo,
         "AGENTS.md",
@@ -528,7 +532,7 @@ def test_warning_12_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> No
     assert "AGENTS.md still carries the `/init` sentinel" in flat(proc.stdout)
 
 
-def test_warning_12_is_silent_while_the_init_skill_is_the_nag(repo: Path) -> None:
+def test_warning_14_is_silent_while_the_init_skill_is_the_nag(repo: Path) -> None:
     write(
         repo,
         "AGENTS.md",
@@ -549,7 +553,7 @@ def test_a_waiver_suppresses_its_rule_and_is_still_printed(repo: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert statuses(proc)["glossary-entry-length"] == "waived"
     assert f"1 problem(s) suppressed: {reason}" in flat(proc.stdout)
-    # and warning 13 prints it a second time, in the waiver table
+    # and warning 15 prints it a second time, in the waiver table
     assert f"glossary-entry-length: 1 problem(s) suppressed — {reason}" in flat(proc.stdout)
 
 
@@ -582,7 +586,7 @@ def test_every_failure_is_reported_and_not_just_the_first(repo: Path) -> None:
     assert verdicts["agent-docs-unpublished"] == "FAIL"
     assert verdicts["skill-file-location"] == "FAIL"
     assert verdicts["repo-shape"] == "FAIL"
-    assert "3 of 12 rules failed" in proc.stderr
+    assert "3 of 13 rules failed" in proc.stderr
 
 
 def test_rule_10_fires_on_a_pre_commit_configuration(repo: Path) -> None:
@@ -661,7 +665,7 @@ def pyproject_python(
 ) -> str:
     """The fixture's pyproject plus whichever Python declarations one test wants.
 
-    A builder rather than five literals because rule 10 is about the COMBINATION: every test
+    A builder rather than five literals because rule 11 is about the COMBINATION: every test
     below differs only in which sites it fills in and what each of them says.
     """
     text = PYPROJECT
@@ -974,3 +978,133 @@ def test_a_workflow_that_will_not_parse_is_read_as_empty_and_not_as_an_exception
     assert "Traceback" not in proc.stderr
     assert statuses(proc)["workflow-step-tasks"] == "ok"
     assert "1 step(s) that run a command, across 2 workflow(s)" in flat(proc.stdout)
+
+
+def test_rule_13_fires_on_a_nav_entry_naming_a_file_that_is_not_there(repo: Path) -> None:
+    # The hole this rule exists for. Measured on the pinned site generator: it does not validate
+    # the nav at all, so `--strict` reports "No issues found", exits 0, and publishes a menu item
+    # whose href points at a page that was never rendered.
+    write(repo, "mkdocs.yml", MKDOCS + "  - Ghost: ghost.md\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["nav-target-exists"] == "FAIL"
+    assert (
+        "mkdocs.yml nav entry `ghost.md` names docs/ghost.md, which is not tracked" in proc.stderr
+    )
+    assert "delete it from the `nav:` list in mkdocs.yml" in flat(proc.stderr)
+
+
+def test_rule_13_passes_a_nav_whose_pages_are_all_there(repo: Path) -> None:
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["nav-target-exists"] == "ok"
+    # The anti-vacuity assertion: a rule handed no entries passes every nav ever written, so the
+    # green above means something only once the run says how many entries it resolved.
+    assert "mkdocs.yml: 2 nav entry(s) against docs/" in flat(proc.stdout)
+
+
+def test_rule_13_is_vacuous_and_not_passing_when_the_repo_publishes_no_site(repo: Path) -> None:
+    # One lab repo ships no docs site at all. Nothing was checked, and a green here would read as
+    # "every menu item resolves", which this run has no evidence for.
+    (repo / "mkdocs.yml").unlink()
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["nav-target-exists"] == "--"
+    assert "not checked: no tracked mkdocs.yml, so this repo publishes no site" in flat(proc.stdout)
+
+
+def test_rule_13_is_vacuous_when_the_site_declares_no_nav(repo: Path) -> None:
+    # No `nav:` is not an empty nav. The generator builds the navbar from the directory tree
+    # instead, so there is no entry to resolve and nothing was checked.
+    write(repo, "mkdocs.yml", "site_name: example\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["nav-target-exists"] == "--"
+    assert "not checked: mkdocs.yml declares no `nav:`" in flat(proc.stdout)
+
+
+def test_rule_13_does_not_flag_a_link_or_an_anchor(repo: Path) -> None:
+    # A nav entry may point out of the site entirely. None of these three names a file, so none
+    # of them is a file that can be missing — and the count proves the two real pages were still
+    # the thing checked.
+    write(
+        repo,
+        "mkdocs.yml",
+        MKDOCS
+        + "  - Issues: https://github.com/liuhlab/example/issues\n"
+        + "  - Mail: mailto:lab@example.org\n"
+        + "  - Top: '#top'\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["nav-target-exists"] == "ok"
+    assert "mkdocs.yml: 2 nav entry(s) against docs/" in flat(proc.stdout)
+
+
+def test_rule_13_fires_on_a_page_that_exists_but_sits_outside_the_site_source(repo: Path) -> None:
+    # The second class, and the reason it is the same rule rather than a separate concern:
+    # `README.md` really is there, so a check that only asked whether the file exists would call
+    # this fine. The builder renders the site source and nothing else, so the menu item 404s
+    # exactly as a missing page does — and the fix is a different one, so it says so.
+    write(repo, "README.md", "# example\n\nThe repo.\n")
+    write(repo, "mkdocs.yml", MKDOCS + "  - Readme: ../README.md\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["nav-target-exists"] == "FAIL"
+    assert "nav entry `../README.md` resolves to README.md, outside docs/" in proc.stderr
+    assert "move the page under docs/" in flat(proc.stderr)
+
+
+def test_rule_13_fires_on_a_page_that_is_present_on_disk_but_untracked(repo: Path) -> None:
+    # It builds on the laptop that wrote it and nowhere else, because CI builds from a checkout.
+    # The problem says which of the two it is, since "it is right there" is what the person
+    # reading the failure is about to say.
+    write(repo, ".gitignore", "docs/draft.md\n")
+    write(repo, "docs/draft.md", "# Draft\n\nNever committed.\n")
+    write(repo, "mkdocs.yml", MKDOCS + "  - Draft: draft.md\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["nav-target-exists"] == "FAIL"
+    assert "names docs/draft.md, which is not tracked" in proc.stderr
+    assert "present on disk but untracked, and CI builds from a checkout" in flat(proc.stderr)
+
+
+def test_rule_13_reads_a_second_configuration_that_inherits_the_first(repo: Path) -> None:
+    # The shape this template itself has: a second config INHERITs `mkdocs.yml`, and its `nav:`
+    # APPENDS to the inherited one rather than replacing it, so both files' entries are in the
+    # navbar the build renders. A rule reading only `mkdocs.yml` would call this tree green.
+    write(repo, "mkdocs.other.yml", "INHERIT: mkdocs.yml\nnav:\n  - Extra: extra.md\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["nav-target-exists"] == "FAIL"
+    assert (
+        "mkdocs.other.yml nav entry `extra.md` names docs/extra.md, which is not tracked"
+        in proc.stderr
+    )
+
+
+def test_rule_13_resolves_an_inherited_docs_dir_and_not_the_default(repo: Path) -> None:
+    # The second configuration names no `docs_dir` of its own, so its nav paths resolve against
+    # the one it inherits. A rule that assumed `docs/` here would report a page that is there —
+    # a false failure on the exact two-file shape this template ships.
+    write(
+        repo, "mkdocs.yml", "site_name: example\ndocs_dir: site-source\nnav:\n  - Home: index.md\n"
+    )
+    write(repo, "site-source/index.md", "# example\n\nThe front page.\n")
+    write(repo, "site-source/extra.md", "# Extra\n\nA second page.\n")
+    write(repo, "mkdocs.other.yml", "INHERIT: mkdocs.yml\nnav:\n  - Extra: extra.md\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["nav-target-exists"] == "ok"
+    assert "mkdocs.other.yml: 1 nav entry(s) against site-source/" in flat(proc.stdout)
+
+
+def test_rule_13_reads_a_site_config_that_will_not_parse_as_empty(repo: Path) -> None:
+    # A derived repo's unusual site config must not turn a conformance rule into a crash. It
+    # contributes no nav, and the configuration that could be read is still reported on.
+    write(repo, "mkdocs.broken.yml", "nav: [\n  - x: }{\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "Traceback" not in proc.stderr
+    assert statuses(proc)["nav-target-exists"] == "ok"
+    assert "not checked: mkdocs.broken.yml declares no `nav:`" in flat(proc.stdout)

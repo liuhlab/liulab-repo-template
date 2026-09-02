@@ -18,10 +18,10 @@ site_description: "One line: what this repo is for. `init-repo` rewrites this."
 # `search: exclude: true` front matter on those pages is for. Neither mechanism
 # substitutes for the other, and `exclude_docs:` is silently ignored, so both are needed.
 #
-# Add a human-facing page here when you write one, and CHECK THE FILE IS THERE — a nav
-# entry naming a missing file builds green and publishes a menu item that 404s. Never add a
-# page under docs/adr/, docs/agents/ or docs/research/: conformance rule 2 fails the build
-# if you do.
+# Add a human-facing page here when you write one. A nav entry naming a missing file builds
+# green and publishes a menu item that 404s, so conformance rule `nav-target-exists` fails
+# it instead. Never add a page under docs/adr/, docs/agents/ or docs/research/: conformance
+# rule `agent-docs-unpublished` fails the build if you do.
 nav:
   - Home: index.md
   - API reference: api.md
@@ -38,9 +38,11 @@ nav:
 #
 # Nothing below fixes the three MISSED rows and no setting does: zensical validates links
 # and not the nav, and it drops mkdocs' `absolute_links:` and `unrecognized_links:` keys in
-# silence, so writing them in would look like a check and be none. Read those three rows as
-# work for a human. Row three needs the mkdocstrings plugin, so a repo without one is down
-# to two.
+# silence, so writing them in would look like a check and be none. The nav row is caught by
+# conformance rule `nav-target-exists` instead, which fails a nav entry naming a file this
+# repo does not track — a setting nothing can be shown to honour is not a gate, so the check
+# went where it can be. Read the other two MISSED rows as work for a human. The third CAUGHT
+# row needs the mkdocstrings plugin, so a repo without one is down to two.
 #
 # `not_found:` and `anchors:` are zensical's defaults, spelled out because they are the two
 # keys mkdocs also understands. The five under them are zensical's own and mkdocs rejects
