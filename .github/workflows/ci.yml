@@ -7,7 +7,9 @@
 #
 # Every step invokes `pixi run <task>` and never a command line. The step list lives in
 # `pyproject.toml` — `check-static` names it once — so this file and a laptop cannot drift:
-# adding a step is one more word there and nothing here.
+# adding a step is one more word there and nothing here. This paragraph is the advice and
+# conformance rule `workflow-step-tasks` is the enforcement, over every workflow in the
+# repo and not only this one; they say one thing, so they change together.
 #
 # Not shipped, deliberately: a `claude.yml`, because on a public repo anyone who can
 # comment could spend the API budget; container and benchmark workflows, because nothing
@@ -95,7 +97,10 @@ jobs:
           locked: true
       # `docs-build` is a task on the `docs` FEATURE, so pixi finds it in the one
       # environment that has zensical and no `-e` flag is needed. The task carries
-      # `--strict`, so a broken link or a bad reference fails here. This job builds the
+      # `--strict`, so a dead link or a bad reference fails here — but not every kind of
+      # broken link, and not a `nav:` entry naming a missing file. The comment above
+      # `validation:` in `mkdocs.yml` lists what this job catches and what it does not, so
+      # a green run here is not a claim the site has no dead ends. This job builds the
       # site and stops; publishing it is `docs.yml`, on `main`.
       - run: pixi run docs-build
 

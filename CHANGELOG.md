@@ -11,7 +11,9 @@ sets one.
 
 - The placeholder package, the pixi workspace, and the three environments.
 - `scripts/check.sh`, the gate runner behind `pixi run check`: it runs every static step
-  concurrently and reports all failures, not just the first.
+  concurrently and reports all failures, not just the first. A step that passes is shown
+  as a short tail and one that fails in full, the summary says how long each step took,
+  and a run stopped with Ctrl-C takes its steps down with it.
 - The writing gate: `vale` and `markdownlint` as steps of `check-static`, with the four
   `Lab` rules tracked in `styles/Lab/`.
 - The three workflows: `ci.yml` runs the gate on every pull request, `docs.yml` publishes
@@ -21,8 +23,25 @@ sets one.
   files, and tags `v0.0.0`. It asks first about anything you have already edited.
 - The `dogfood` job, which renders this template for all three shapes on every pull
   request and proves each new repo passes its own checks and builds its own site.
+- A conformance rule that fails a publishing workflow a tag push can trigger, and the
+  workflow reader it is built on: the check now parses every workflow file, its triggers
+  and its steps, instead of only reading text.
+- A conformance rule for the Python version. The pixi pin has to meet the
+  `requires-python` floor, and any tool that writes a language level down has to write that
+  floor. It checks that the declarations agree, and does not count them, so a repo that
+  supports a range of Python versions still passes.
+- A conformance rule that fails a workflow step running a command of its own instead of
+  `pixi run <task>`, or naming a task nothing declares. The step list stays in one place,
+  so what CI runs and what your laptop runs cannot quietly stop being the same thing.
 - `docs/template/index.md`, the page that says what the template ships and how to make a
   repo from it, and `mkdocs.template.yml`, which inherits `mkdocs.yml` and names the site
   after this repo while the shipped config keeps the placeholder. Both are template-only:
   `init-repo` deletes them, takes `-f mkdocs.template.yml` off the two docs tasks, and cuts
   the front page's pointer at the page.
+- Docstring examples as tests. `pytest` collects the doctests in `src/` alongside `tests/`,
+  so an example that has drifted from the code it documents fails the gate. `docs/api.md`
+  says how to mark a line that cannot run offline.
+- A `validation:` block in `mkdocs.yml` turning on the five link checks the site builder
+  ships switched off, and a comment beside it listing, from measurement, which broken links
+  a strict build catches and which three it lets through. A `nav:` entry naming a file that
+  is not there is one of the three, and no setting catches it.

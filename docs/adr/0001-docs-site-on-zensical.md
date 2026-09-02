@@ -8,7 +8,7 @@ search:
 The site is built by `zensical`, pinned `==0.0.57`, not by mkdocs plus mkdocs-material.
 zensical reads the same `mkdocs.yml`, runs the same Python-Markdown extensions in-process,
 and renders mkdocstrings, so one repo can move back to mkdocs by changing two lines in
-`pyproject.toml`.
+`pyproject.toml` and dropping the zensical-only validation keys from `mkdocs.yml`.
 
 ## Why this is surprising
 
@@ -29,9 +29,12 @@ Three gaps, each with a named workaround:
   or not it is listed anywhere. Agent-facing pages therefore carry `search: exclude: true`
   front matter, and `mkdocs.yml` carries an explicit `nav:`. Front matter does nothing
   about the navbar; `nav:` does nothing about search. Both, always.
-- **A `nav:` entry naming a missing file no longer fails `--strict`.** `mkdocs build
-  --strict` caught that. Dead internal links and unresolved mkdocstrings references still
-  fail, so `--strict` is still worth passing.
+- **`--strict` validates links, not the `nav:`.** A nav entry naming a missing file failed
+  a strict mkdocs build and passes this one, and no setting turns that back on. Dead links
+  and dead anchors still fail, so `--strict` is worth passing. The measured list of what it
+  catches and misses is a comment in `mkdocs.yml`, beside the `nav:` a maintainer edits and
+  the settings it turns on — this record is deleted from a repo made from the template, and
+  the gap is not.
 
 The research note expected one residue — excluded pages still listed in `sitemap.xml`. With
 an explicit `nav:` that does not happen: zensical builds the sitemap from the nav, so the

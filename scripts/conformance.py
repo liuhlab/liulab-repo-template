@@ -5,7 +5,7 @@
     python scripts/conformance.py [--root PATH]
 
 It states the RULE, not the file contents — a pull model, so a repo that legitimately diverges
-stays green while the shared conventions stay checked. Ten rules: eight fail, two only warn.
+stays green while the shared conventions stay checked. Fourteen rules: twelve fail, two only warn.
 
 Three things it does on purpose:
 
@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import posixpath
 import re
+import shlex
 import subprocess
 import sys
 import textwrap
@@ -55,7 +56,7 @@ import yaml
 #: neither happens.
 PLACEHOLDER = "new" + "pkg"
 
-#: Rule 1 and warning 9 are both gated on this directory, and it is the only discriminator either
+#: Rule 1 and warning 12 are both gated on this directory, and it is the only discriminator either
 #: needs. While it is here, `init-repo` has not run: the placeholder is still the repo's own name,
 #: and the auto-discovered skill is itself the nag. Once it is gone the repo claims to be its own,
 #: and both rules start checking.
@@ -68,9 +69,51 @@ UNWAIVABLE = "placeholder-rename"
 #: site publishes, so it reads this rather than assuming.
 DEFAULT_DOCS_DIR = "docs"
 
+#: Where GitHub reads workflows, and the two file endings it accepts. Nothing below this
+#: directory is a workflow, and nothing above it is read.
+WORKFLOW_DIR = ".github/workflows/"
+WORKFLOW_SUFFIXES = (".yml", ".yaml")
+
+#: The publishing workflow, named by PATH rather than sniffed out of its contents. That is a
+#: deliberate choice and not a shortcut: a package index binds its trusted publisher to an owner,
+#: a repository and a WORKFLOW FILENAME, so this name is external configuration — rename the file
+#: and the repo cannot publish at all. `init-repo` also deletes it by this exact path. Rules 8 and
+#: 9 both read it, so the name is written here once and nowhere else.
+RELEASE_WORKFLOW = f"{WORKFLOW_DIR}release.yml"
+
 #: Vale's spelling of on and off. Both forms appear in the wild; the gate accepts either.
 VALE_ON = {"YES", "TRUE", "ON"}
 VALE_OFF = {"NO", "FALSE", "OFF"}
+
+#: The command a workflow step is allowed to run, and the table its task must be declared in.
+#: Both are named here because rule 11's problem text and its fix both spell them.
+PIXI_RUN = "pixi run"
+TASK_TABLE = "[tool.pixi.tasks]"
+
+#: The `pixi run` options that take a SEPARATE value, so the token after one is that value and
+#: never the task name. The `--option=value` form needs no entry, being one token. Anything else
+#: beginning with `-` is read as a switch, so an option pixi grows later would be mistaken for the
+#: task and reported LOUDLY — the safe direction of error for a check whose whole job is to notice
+#: drift nobody announced.
+PIXI_VALUE_OPTIONS = frozenset(
+    {
+        "-e",
+        "--environment",
+        "--manifest-path",
+        "--color",
+        "--auth-file",
+        "--pypi-keyring-provider",
+        "--concurrent-solves",
+        "--concurrent-downloads",
+    }
+)
+
+#: What a `${{ ... }}` expression is replaced by before a step's command is split into tokens.
+#: GitHub substitutes these when the job runs, and `shlex` would split one into three tokens and
+#: read the middle as the task name. The stand-in is not a legal task name, so a step that names
+#: its task with an expression is reported as unresolved rather than failed.
+EXPRESSION = "${{}}"
+_EXPRESSION_RE = re.compile(r"\$\{\{.*?\}\}", re.DOTALL)
 
 _SECTION_RE = re.compile(r"^\[(?P<header>.+)\]\s*$")
 _SETTING_RE = re.compile(r"^(?P<key>[A-Za-z][^=]*?)\s*=\s*(?P<value>.*?)\s*$")
@@ -82,6 +125,50 @@ _SKILL_FILE_RE = re.compile(r"^skills/[^/]+/SKILL\.md$")
 _SKILL_DIR_RES = (
     re.compile(r"^skills/(?P<name>[^/]+)/"),
     re.compile(r"^\.(?:claude|agents)/skills/(?P<name>[^/]+)(?:/|$)"),
+)
+
+
+@dataclass(frozen=True)
+class SecondToolchain:
+    """One toolchain other than pixi, and where it would declare a dependency version.
+
+    Attributes
+    ----------
+    tool
+        The tool named in the failure, and listed in the note that says what was looked for.
+    path
+        A regex FULL-matched against a repo-relative tracked path. A pattern with no `/` in it
+        therefore matches at the repo root and nowhere else, which is where a resolver reads:
+        `tests/fixtures/requirements.txt` is a test's input, not this repo's dependencies.
+    table
+        A dotted table in `pyproject.toml`, for a tool that declares versions in the manifest
+        instead of a file of its own — a second build backend's dependency section.
+    """
+
+    tool: str
+    path: str = ""
+    table: str = ""
+
+
+#: Every second place a dependency version can be declared. Rule 10 reads this and nothing else,
+#: so covering one more tool is one more line here.
+#:
+#: It is a constant and not a `[tool.liulab.*]` key because it is not a claim a repo makes about
+#: itself: the rule is the same in every Liu Lab repo, and a repo that must keep one of these has
+#: `[tool.liulab.waived]`, which is printed on every run. A manifest list could be emptied
+#: instead, and an escape hatch nobody can see is the thing this file exists to prevent.
+#:
+#: Lockfiles are named per tool, never `*.lock`: `pixi.lock` is the lock this rule protects.
+#: `setup.cfg` is absent because it commonly carries only tool configuration and no dependency.
+SECOND_TOOLCHAINS: tuple[SecondToolchain, ...] = (
+    SecondToolchain("pre-commit", path=r"\.pre-commit-config\.ya?ml"),
+    SecondToolchain("pip", path=r"[^/]*requirements[^/]*\.txt|requirements/[^/]+\.txt"),
+    SecondToolchain("conda", path=r"[^/]*environment[^/]*\.ya?ml"),
+    SecondToolchain("pipenv", path=r"Pipfile(\.lock)?"),
+    SecondToolchain("setuptools", path=r"setup\.py"),
+    SecondToolchain("poetry", path=r"poetry\.lock", table="tool.poetry"),
+    SecondToolchain("uv", path=r"uv\.lock", table="tool.uv"),
+    SecondToolchain("pdm", path=r"pdm\.lock", table="tool.pdm"),
 )
 
 
@@ -126,6 +213,108 @@ class Result:
 
     problems: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class Step:
+    """One step of one job, flattened out of the workflow it came from.
+
+    Attributes
+    ----------
+    workflow
+        Repo-relative path of the file this step was written in.
+    job
+        The job key it sits under, so a report can say where without a second lookup.
+    index
+        Its position in that job's `steps:` list, counting from zero. A step need not have a
+        `name:`, and this is the only thing that always identifies one.
+    name, uses, run
+        The three keys a rule asks about, each ``None`` when the step does not set it. A step
+        has `uses` or `run` and never both.
+    """
+
+    workflow: str
+    job: str
+    index: int
+    name: str | None
+    uses: str | None
+    run: str | None
+
+
+@dataclass(frozen=True)
+class Workflow:
+    """One workflow definition, parsed once for every rule that reads workflows.
+
+    Attributes
+    ----------
+    path
+        Repo-relative path, e.g. `.github/workflows/ci.yml`.
+    name
+        The `name:` key, or the file stem when the workflow does not name itself.
+    triggers
+        The `on:` block, normalized to event name -> the configuration under it, with `{}` for
+        an event written bare. All three spellings — `on: push`, `on: [push, pull_request]` and
+        the mapping form — arrive here identically, so a rule never has to ask which was used.
+    steps
+        Every step of every job, in file order, each carrying the job it came from. Flat because
+        the rules that read steps ask about all of them, and a step knows its own job.
+    """
+
+    path: str
+    name: str
+    triggers: dict[str, Any]
+    steps: tuple[Step, ...]
+
+
+def _string(value: Any) -> str | None:
+    """One YAML scalar as a string, or ``None`` when the key was absent or not a scalar."""
+    return value if isinstance(value, str) else None
+
+
+def _triggers(document: dict[Any, Any]) -> dict[str, Any]:
+    """Read a workflow's `on:` block as event name -> its configuration.
+
+    Read under two keys, because YAML 1.1 resolves an unquoted `on` to the boolean true: every
+    workflow GitHub accepts arrives with its triggers under ``True``, and `document["on"]` finds
+    them only in the rare file that quoted the key. Looking under one key alone is not a parse
+    bug that shows up later — it makes every rule about triggers pass on nothing.
+    """
+    raw = document.get("on", document.get(True))
+    if isinstance(raw, str):
+        return {raw: {}}
+    if isinstance(raw, list):
+        return {str(event): {} for event in raw}
+    if isinstance(raw, dict):
+        return {str(event): {} if config is None else config for event, config in raw.items()}
+    return {}
+
+
+def _steps(path: str, document: dict[Any, Any]) -> tuple[Step, ...]:
+    """Every step of every job in one workflow, flattened, in file order."""
+    jobs = document.get("jobs")
+    if not isinstance(jobs, dict):
+        return ()
+    steps: list[Step] = []
+    for job_id, job in jobs.items():
+        if not isinstance(job, dict):
+            continue
+        raw = job.get("steps")
+        if not isinstance(raw, list):
+            continue
+        for index, step in enumerate(raw):
+            if not isinstance(step, dict):
+                continue
+            steps.append(
+                Step(
+                    workflow=path,
+                    job=str(job_id),
+                    index=index,
+                    name=_string(step.get("name")),
+                    uses=_string(step.get("uses")),
+                    run=_string(step.get("run")),
+                )
+            )
+    return tuple(steps)
 
 
 @dataclass
@@ -196,6 +385,57 @@ class Repo:
             entries[posixpath.normpath(f"{self.docs_dir}/{raw}")] = raw
         return entries
 
+    @cached_property
+    def manifest(self) -> dict[str, Any]:
+        """`pyproject.toml`, parsed. `load` refused to build this repo unless it parses."""
+        return tomllib.loads(self.read("pyproject.toml") or "")
+
+    @cached_property
+    def tasks(self) -> frozenset[str]:
+        """Every pixi task name the manifest declares, wherever under `[tool.pixi]` it is written.
+
+        Walked rather than read out of `[tool.pixi.tasks]` alone. pixi lets a task be declared on
+        the workspace, on a FEATURE, or on a platform target, and this repo's own `docs-build`
+        lives on the `docs` feature — so a rule reading one table would fail the docs job of a
+        workflow that is entirely correct.
+        """
+        return frozenset(_task_names(self.manifest.get("tool", {}).get("pixi")))
+
+    @cached_property
+    def workflows(self) -> tuple[Workflow, ...]:
+        """Every tracked workflow definition, parsed, in path order.
+
+        TRACKED and not globbed off disk: a workflow GitHub never sees is not a workflow, and
+        every other rule here reads the same list.
+
+        The rules that read workflows want different halves of one — what triggers it, or what
+        its steps invoke — so :class:`Workflow` exposes both and no rule parses YAML itself. A
+        file that will not parse, or that is not a mapping, becomes an empty workflow rather than
+        an exception: `_TolerantLoader` already shrugs at an unknown tag, and a derived repo's
+        unusual workflow must not turn a conformance rule into a crash.
+        """
+        found: list[Workflow] = []
+        for rel in self.tracked:
+            if not rel.startswith(WORKFLOW_DIR) or not rel.endswith(WORKFLOW_SUFFIXES):
+                continue
+            text = self.read(rel)
+            if text is None:
+                continue
+            try:
+                loaded = yaml.load(text, Loader=_TolerantLoader)
+            except yaml.YAMLError:
+                loaded = None
+            document: dict[Any, Any] = loaded if isinstance(loaded, dict) else {}
+            found.append(
+                Workflow(
+                    path=rel,
+                    name=_string(document.get("name")) or PurePosixPath(rel).stem,
+                    triggers=_triggers(document),
+                    steps=_steps(rel, document),
+                )
+            )
+        return tuple(found)
+
 
 def _walk_strings(node: Any) -> Iterator[str]:
     """Every string value in a `nav:` tree, at any depth.
@@ -212,6 +452,58 @@ def _walk_strings(node: Any) -> Iterator[str]:
     elif isinstance(node, dict):
         for value in node.values():  # pyright: ignore[reportUnknownVariableType]
             yield from _walk_strings(value)
+
+
+def _task_names(node: Any) -> Iterator[str]:
+    """Every key of every `tasks` table at any depth, wherever pixi accepts one.
+
+    One walk rather than four reads: a task may be declared on the workspace, on a feature, on a
+    platform target, or on a target under a feature.
+    """
+    if not isinstance(node, dict):
+        return
+    for key, value in node.items():  # pyright: ignore[reportUnknownVariableType]
+        if key == "tasks" and isinstance(value, dict):
+            yield from (str(name) for name in value)  # pyright: ignore[reportUnknownVariableType]
+        else:
+            yield from _task_names(value)
+
+
+def _invoked_task(run: str) -> str | None:
+    """Read the pixi task one step's `run:` script invokes, or ``None`` when it runs a command.
+
+    The accepted shape is `pixi run`, any pixi options, and one more token — the task. Options are
+    skipped on both sides of `run`, so `pixi run -e test test` and `pixi run docs-build` arrive
+    the same way and no spelling is privileged.
+
+    Nothing may follow the task, and that is the strict half of the rule rather than an oversight.
+    A step passing arguments of its own is the drift this rule is about, one level down: the
+    arguments a task runs with belong in the task, which is exactly where `check-static` keeps its
+    own list. A script of several lines, or two commands joined by `&&`, leaves tokens after the
+    task and lands here too.
+    """
+    script = _EXPRESSION_RE.sub(EXPRESSION, run)
+    try:
+        tokens = shlex.split(script, comments=True)
+    except ValueError:
+        # An unbalanced quote. Not a crash and not a pass: whatever it is, it is not this shape.
+        return None
+    if not tokens or tokens[0] != "pixi":
+        return None
+    index = _skip_options(tokens, 1)
+    if index >= len(tokens) or tokens[index] != "run":
+        return None
+    index = _skip_options(tokens, index + 1)
+    if len(tokens) - index != 1:
+        return None
+    return tokens[index]
+
+
+def _skip_options(tokens: list[str], index: int) -> int:
+    """Advance past the options at `index`, taking the value of one that has a separate value."""
+    while index < len(tokens) and tokens[index].startswith("-"):
+        index += 2 if tokens[index] in PIXI_VALUE_OPTIONS else 1
+    return index
 
 
 def _front_matter(text: str) -> dict[str, Any] | None:
@@ -291,8 +583,78 @@ def _glossary_entries(text: str) -> list[tuple[str, int]]:
     return entries
 
 
+def _has_table(manifest: dict[str, Any], dotted: str) -> bool:
+    """Whether a dotted table — `tool.poetry` — is present in a parsed manifest."""
+    node: Any = manifest
+    for part in dotted.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return False
+        node = node[part]
+    return True
+
+
+#: A `major.minor` anywhere in a version a tool spells out — `3.13`, `3.13.*`, `>=3.13,<3.14`.
+_MINOR_RE = re.compile(r"(?P<major>\d+)\.(?P<minor>\d+)")
+#: The lowest version a `requires-python` specifier admits. `<` and `!=` name no floor at all.
+_FLOOR_RE = re.compile(r"(?:>=|~=|==)\s*(?P<major>\d+)\.(?P<minor>\d+)")
+#: Ruff's spelling: one digit of major, the rest minor, so `py313` is 3.13 and `py39` is 3.9.
+_RUFF_TARGET_RE = re.compile(r"^py(?P<major>\d)(?P<minor>\d+)$")
+
+#: Where a repo writes a LANGUAGE LEVEL down, beyond the floor and the pin: the table, the key,
+#: the pattern that reads it, and how that tool spells a level back. A repo that adds a tool adds
+#: one line here. Trove classifiers are deliberately absent — `Programming Language :: Python ::
+#: 3.12` is a list of versions a package supports, not a level, and a library names several.
+_LEVEL_SITES: tuple[tuple[tuple[str, ...], str, re.Pattern[str], str], ...] = (
+    (("tool", "ruff"), "target-version", _RUFF_TARGET_RE, "py{0}{1}"),
+    (("tool", "pyright"), "pythonVersion", _MINOR_RE, "{0}.{1}"),
+    (("tool", "mypy"), "python_version", _MINOR_RE, "{0}.{1}"),
+)
+
+
+def _table(root: dict[str, Any], *path: str) -> dict[str, Any]:
+    """One nested table of a parsed TOML file, or an empty mapping where the path runs out."""
+    node: Any = root
+    for key in path:
+        node = node.get(key) if isinstance(node, dict) else None
+    return node if isinstance(node, dict) else {}
+
+
+def _version(text: str, pattern: re.Pattern[str]) -> tuple[int, int] | None:
+    """Read the (major, minor) a pattern finds in one declaration.
+
+    ``None`` when the pattern finds none, which is a declaration nothing can be held to.
+    """
+    match = pattern.search(text.strip())
+    return (int(match["major"]), int(match["minor"])) if match else None
+
+
+def _spell(level: tuple[int, int]) -> str:
+    """Write a (major, minor) the way a person says it."""
+    return f"{level[0]}.{level[1]}"
+
+
+def _python_pins(pyproject: dict[str, Any]) -> dict[str, str]:
+    """Every pixi `python` pin, keyed by the table header that holds it.
+
+    Features are read as well as the default table, because a repo that really supports a range
+    gives its floor an environment to resolve in, and rule 10 says so in its notes. A pin may be
+    written `python = "3.13.*"` or `python = { version = "3.13.*" }`; both are the same claim.
+    """
+    tables: set[tuple[str, ...]] = {("tool", "pixi", "dependencies")}
+    for name in _table(pyproject, "tool", "pixi", "feature"):
+        tables.add(("tool", "pixi", "feature", name, "dependencies"))
+    pins: dict[str, str] = {}
+    for path in sorted(tables):
+        value: Any = _table(pyproject, *path).get("python")
+        if isinstance(value, dict):
+            value = value.get("version")
+        if isinstance(value, str):
+            pins[f"[{'.'.join(path)}] python"] = value
+    return pins
+
+
 # --------------------------------------------------------------------------------------
-# The rules. Eight fail, two warn. Each returns what it found; nothing here exits or prints.
+# The rules. Twelve fail, two warn. Each returns what it found; nothing here exits or prints.
 # --------------------------------------------------------------------------------------
 
 
@@ -550,7 +912,8 @@ def rule_skill_symlinks(repo: Repo) -> Result:
 def rule_repo_shape(repo: Repo) -> Result:
     """8. If there is a package there are tests; if there is a release workflow there is a log."""
     result = Result()
-    release = ".github/workflows/release.yml"
+    # Named once, at RELEASE_WORKFLOW, because rule 9 keys on the same file.
+    release = RELEASE_WORKFLOW
     # Both halves are CONDITIONAL, and an absent premise is vacuous rather than failing: a repo
     # with no package is not a repo that failed to have tests. That is the whole shape of the
     # rule, and it is why the notes below say which premise was absent.
@@ -583,8 +946,259 @@ def rule_repo_shape(repo: Repo) -> Result:
     return result
 
 
+def _tag_push_events(workflow: Workflow) -> list[str]:
+    """List the triggers in one workflow that pushing a tag can fire, spelled as they are written.
+
+    Three of them, and only the first is the one people think of:
+
+    - `push:` with a `tags:` or `tags-ignore:` filter — the trigger written on purpose.
+    - `push:` naming no branch filter at all. An absent filter is not "no refs", it is EVERY
+      ref, so a bare `push:` fires on a tag exactly as it fires on a branch. `paths:` narrows
+      which files, never which refs.
+    - `create`, which fires on a branch or a tag coming into existence, and a pushed tag is a
+      tag coming into existence.
+
+    A `push:` that names `branches:` or `branches-ignore:` is a branch trigger and is absent
+    from this list: naming any branch filter is what stops tags reaching the workflow.
+    """
+    fired: list[str] = []
+    if "push" in workflow.triggers:
+        config = workflow.triggers["push"]
+        config = config if isinstance(config, dict) else {}
+        if "tags" in config or "tags-ignore" in config:
+            fired.append("`on: push:` names `tags:`")
+        elif not ("branches" in config or "branches-ignore" in config):
+            fired.append("`on: push:` names no branch filter, so it fires on every ref, tags too")
+    if "create" in workflow.triggers:
+        fired.append("`on: create:` fires when a tag comes into existence")
+    return fired
+
+
+def rule_release_trigger(repo: Repo) -> Result:
+    """9. Nothing a tag push fires can trigger the publishing workflow."""
+    result = Result()
+    publishing = [w for w in repo.workflows if w.path == RELEASE_WORKFLOW]
+    if not publishing:
+        result.notes.append(
+            f"not checked: no {RELEASE_WORKFLOW}, so this repo publishes to no package index"
+        )
+        return result
+    for workflow in publishing:
+        for fired in _tag_push_events(workflow):
+            result.problems.append(
+                _problem(
+                    f"{workflow.path} can be triggered by a tag push: {fired}",
+                    "publishing is the one act in this toolchain that cannot be undone — a "
+                    "version can be neither unpublished nor reused — and `init-repo` pushes a "
+                    "first tag on a repo's opening day, so this trigger publishes from a repo "
+                    "nobody has finished naming",
+                    "trigger it on `release:` with `types: [published]`, which is a person "
+                    "publishing a GitHub Release on purpose, and add `workflow_dispatch:` for "
+                    "re-running one that failed",
+                )
+            )
+    events = ", ".join(sorted(event for w in publishing for event in w.triggers))
+    result.notes.append(f"{RELEASE_WORKFLOW} is triggered by {events or 'nothing'}")
+    return result
+
+
+def rule_single_toolchain(repo: Repo) -> Result:
+    """10. No second toolchain is configured: pixi and the manifest are the only ones."""
+    result = Result()
+    # One why for every marker, because it is one failure: the class, not the tool.
+    why = (
+        "two resolvers can disagree, and it fails silently rather than loudly: a version "
+        "declared here is one `pixi.lock` never sees, so an environment built from it and the "
+        "environment the gate runs in differ while both look correct. pyproject.toml is the "
+        "single source of truth for dependencies, environments and tasks"
+    )
+    for marker in SECOND_TOOLCHAINS:
+        if marker.path:
+            for rel in repo.tracked:
+                if re.fullmatch(marker.path, rel):
+                    result.problems.append(
+                        _problem(
+                            f"{rel} declares dependencies for {marker.tool}, a second toolchain",
+                            why,
+                            f"delete {rel} and declare what it pinned in pyproject.toml — "
+                            "`[tool.pixi.dependencies]` for a package, `[tool.pixi.tasks]` for a "
+                            "command — then run `pixi install`",
+                        )
+                    )
+        if marker.table and _has_table(repo.manifest, marker.table):
+            result.problems.append(
+                _problem(
+                    f"pyproject.toml has [{marker.table}], which configures {marker.tool}",
+                    why,
+                    f"delete [{marker.table}] and every table under it, declare what it pinned "
+                    "under `[tool.pixi.dependencies]`, then run `pixi install`",
+                )
+            )
+    # This rule is never vacuous — the list is always there and so is the manifest — but a run
+    # still has to say WHICH second toolchains it knew to look for, or a green means nothing.
+    names = ", ".join(marker.tool for marker in SECOND_TOOLCHAINS)
+    result.notes.append(
+        f"{len(SECOND_TOOLCHAINS)} second toolchain(s) looked for across "
+        f"{len(repo.tracked)} tracked path(s) and pyproject.toml: {names}"
+    )
+    return result
+
+
+def rule_python_version_agreement(repo: Repo) -> Result:
+    """11. Every declared Python version agrees with the floor and with the pinned interpreter."""
+    result = Result()
+    # AGREEMENT, never a count. A repo supporting a range of Pythons declares a floor below its
+    # pin and holds its tools to the floor, and a rule that counted declarations would fail it —
+    # which would make this template unusable for a library. What cannot legitimately differ is
+    # what the declarations SAY.
+    pins = _python_pins(repo.manifest)
+    pinned: dict[str, tuple[int, int]] = {}
+    for where, spelling in pins.items():
+        level = _version(spelling, _MINOR_RE)
+        if level is not None:
+            pinned[where] = level
+    if not pinned:
+        if pins:
+            spelled = ", ".join(f"{where} is `{pins[where]}`" for where in sorted(pins))
+            reason = f"no pixi `python` pin names a minor version: {spelled}"
+        else:
+            reason = "no `python` in [tool.pixi.dependencies] or in any pixi feature"
+        result.notes.append(
+            f"not checked: {reason} — this repo names no interpreter for the other declarations "
+            "to agree with"
+        )
+        return result
+
+    requires = _table(repo.manifest, "project").get("requires-python")
+    requires = requires if isinstance(requires, str) else None
+    floor = _version(requires, _FLOOR_RE) if requires is not None else None
+    lowest = min(pinned.values())
+    for where, level in sorted(pinned.items()):
+        if floor is not None and level < floor:
+            result.problems.append(
+                _problem(
+                    f"{where} `{pins[where]}` pins {_spell(level)}, below the "
+                    f"[project] requires-python floor `{requires}`",
+                    "the repo runs an interpreter its own package metadata says it does not "
+                    "support, so every gate is green on a version pip would refuse to install on",
+                    f"raise the pin to {_spell(floor)}, or lower requires-python to "
+                    f">={_spell(level)}",
+                )
+            )
+
+    # The language level a tool holds the code to is the OLDEST interpreter the repo supports:
+    # the floor where one is declared, and otherwise the lowest thing pinned.
+    if floor is not None:
+        wanted, source = floor, f"[project] requires-python `{requires}`"
+    else:
+        wanted = lowest
+        at_lowest = next(where for where, level in sorted(pinned.items()) if level == lowest)
+        source = f"{at_lowest} `{pins[at_lowest]}`"
+    declared = [f"[project] requires-python `{requires}`"] if requires is not None else []
+    declared += [f"{where} `{pins[where]}`" for where in sorted(pinned)]
+    for path, key, pattern, spelling in _LEVEL_SITES:
+        table = _table(repo.manifest, *path)
+        if key not in table:
+            continue
+        where = f"[{'.'.join(path)}] {key}"
+        said = str(table[key])
+        declared.append(f"{where} `{said}`")
+        level = _version(said, pattern)
+        if level is None:
+            result.problems.append(
+                _problem(
+                    f"{where} is `{said}`, which names no Python version",
+                    "a level this check cannot read is a level nothing can hold to the floor, and "
+                    f"{path[-1]} may well be reading it as something else again",
+                    f"write it the way {path[-1]} spells a version, or delete the key",
+                )
+            )
+            continue
+        if level != wanted:
+            result.problems.append(
+                _problem(
+                    f"{where} `{said}` says {_spell(level)}, and {source} says {_spell(wanted)}",
+                    "this is the language level the tool holds the code to, and it has to be the "
+                    "oldest interpreter the repo supports. Above the floor it lets through syntax "
+                    "that fails on a version the package claims to install on; below it the tool "
+                    "rejects code the repo is allowed to write",
+                    f'write `{key} = "{spelling.format(*wanted)}"`, or delete the key — with no '
+                    f"{key} the level is derived from the floor and the pin",
+                )
+            )
+
+    result.notes.append(f"{len(declared)} declaration(s): {'; '.join(declared)}")
+    # The one thing this rule CANNOT see. A floor below every pin is either a range the repo
+    # deliberately supports or a floor nobody lowered when the pin moved up, and the declarations
+    # read identically in both cases. Saying so is the point: a rule that quietly cannot tell them
+    # apart is worse than one that reports which it checked.
+    if floor is not None and floor < lowest:
+        result.notes.append(
+            f"not checked: whether {_spell(floor)} is ever resolved or tested. Nothing here pins "
+            f"it, so a range this repo supports on purpose and a floor left behind by a raised "
+            f"pin look the same — pin {_spell(floor)} in a pixi feature to make the claim real"
+        )
+    elif floor is not None and len(set(pinned.values())) > 1:
+        result.notes.append(f"the floor {_spell(floor)} is itself pinned, so pixi resolves it")
+    return result
+
+
+def rule_workflow_step_tasks(repo: Repo) -> Result:
+    """12. Every workflow step that runs anything invokes a task the manifest declares."""
+    result = Result()
+    # `uses:` steps are not examined at all, and that is the rule and not an exemption: an action
+    # is a dependency the workflow pulls in, not a step of this repo's own build, and there is no
+    # task for it to have been.
+    running = [step for w in repo.workflows for step in w.steps if step.run is not None]
+    if not running:
+        result.notes.append("not checked: no tracked workflow has a step that runs a command")
+        return result
+    unresolved = 0
+    for step in running:
+        where = f"{step.workflow} job `{step.job}` step {step.index}"
+        if step.name:
+            where += f" ({step.name})"
+        task = _invoked_task(step.run or "")
+        if task is None:
+            result.problems.append(
+                _problem(
+                    f"{where} runs a command rather than `{PIXI_RUN} <task>`",
+                    "the step list lives in the task table so that CI and a laptop run the same "
+                    "steps by construction. A step that spells out a command runs something no "
+                    "local `pixi run` does, and both stay green while they quietly stop being the "
+                    "same claim — until someone notices the two lists disagree, months later",
+                    f"declare what it runs as a task in {TASK_TABLE}, arguments included, and "
+                    f"make the step `{PIXI_RUN} <that task>`",
+                )
+            )
+        elif EXPRESSION in task:
+            unresolved += 1
+        elif task not in repo.tasks:
+            result.problems.append(
+                _problem(
+                    f"{where} invokes `{task}`, which this repo declares no task by",
+                    "a step naming a task nobody declared cannot run at all, and the workflow "
+                    "that finds out is often one that runs rarely — the publish, the scheduled "
+                    "job — so the break surfaces on the day it costs the most. It reads as if it "
+                    "were following the convention, which is what makes it worse than a command",
+                    f"declare `{task}` in pyproject.toml under {TASK_TABLE}, or point the step at "
+                    "a task that is declared",
+                )
+            )
+    result.notes.append(
+        f"{len(running)} step(s) that run a command, across {len(repo.workflows)} workflow(s), "
+        f"against {len(repo.tasks)} declared task(s)"
+    )
+    if unresolved:
+        result.notes.append(
+            f"{unresolved} step(s) name their task with a `" + EXPRESSION + "` expression, which "
+            "GitHub resolves when the job runs and this cannot"
+        )
+    return result
+
+
 def warning_init_sentinel(repo: Repo) -> Result:
-    """9. `AGENTS.md` still carries the line telling you to run `/init`."""
+    """13. `AGENTS.md` still carries the line telling you to run `/init`."""
     result = Result()
     if repo.exists(INIT_SKILL):
         result.notes.append(f"not checked: {INIT_SKILL}/ is here, and that skill is the nag")
@@ -678,6 +1292,35 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         9,
+        "release-trigger",
+        f"{RELEASE_WORKFLOW} is triggered by publishing a GitHub Release and by nothing a tag "
+        "push fires — not `push: tags:`, not a `push:` with no branch filter, not `create`",
+        rule_release_trigger,
+    ),
+    Rule(
+        10,
+        "single-toolchain",
+        "no second toolchain is configured — no pre-commit config, requirements file, conda "
+        "environment or foreign resolver's table declares a version the pixi lock never sees",
+        rule_single_toolchain,
+    ),
+    Rule(
+        11,
+        "python-version-agreement",
+        "every pixi python pin satisfies the requires-python floor, and every tool that writes a "
+        "language level down writes the floor — agreement, not a count, so a range still passes",
+        rule_python_version_agreement,
+    ),
+    Rule(
+        12,
+        "workflow-step-tasks",
+        f"every workflow step that runs a command invokes a declared task — `{PIXI_RUN} <task>` "
+        f"and nothing else, with the task in {TASK_TABLE}, so the step list cannot drift from the "
+        "one a laptop runs. A step that `uses:` an action is not a step of this repo's build",
+        rule_workflow_step_tasks,
+    ),
+    Rule(
+        13,
         "init-sentinel",
         "AGENTS.md is still the template's generic copy",
         warning_init_sentinel,
@@ -685,9 +1328,9 @@ RULES: tuple[Rule, ...] = (
     ),
 )
 
-#: Warning 10 is not a rule with a tree to inspect: it is the waiver table itself, printed on
+#: Warning 14 is not a rule with a tree to inspect: it is the waiver table itself, printed on
 #: every run. It lives in `report` because only the reporter knows what each waiver suppressed.
-WAIVER_RULE = (10, "waivers")
+WAIVER_RULE = (14, "waivers")
 
 
 def load(root: Path) -> Repo:
@@ -738,7 +1381,7 @@ def _verdict(repo: Repo, rule: Rule, result: Result) -> tuple[str, list[str]]:
 
 
 def _waiver_lines(repo: Repo, results: list[tuple[Rule, Result]]) -> list[str]:
-    """Warning 10: every waiver, with what it actually suppressed.
+    """Warning 14: every waiver, with what it actually suppressed.
 
     A waiver naming no rule is called out rather than ignored, and so is one naming rule 1, which
     refuses to be waived. A waiver that quietly does nothing is the same invisible escape hatch
@@ -788,6 +1431,9 @@ def report(repo: Repo, results: list[tuple[Rule, Result]]) -> int:
                     width=110,
                     initial_indent=head if index == 0 else " " * len(head),
                     subsequent_indent=" " * len(head),
+                    # Notes are mostly identifiers — `target-version`, `agent-docs`, a path — and
+                    # a wrap inside one leaves a name no reader can grep for.
+                    break_on_hyphens=False,
                 )
             )
 

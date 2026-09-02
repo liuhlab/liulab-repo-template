@@ -18,11 +18,44 @@ site_description: "One line: what this repo is for. `init-repo` rewrites this."
 # `search: exclude: true` front matter on those pages is for. Neither mechanism
 # substitutes for the other, and `exclude_docs:` is silently ignored, so both are needed.
 #
-# Add a human-facing page here when you write one. Never add a page under docs/adr/,
-# docs/agents/ or docs/research/: conformance rule 2 fails the build if you do.
+# Add a human-facing page here when you write one, and CHECK THE FILE IS THERE — a nav
+# entry naming a missing file builds green and publishes a menu item that 404s. Never add a
+# page under docs/adr/, docs/agents/ or docs/research/: conformance rule 2 fails the build
+# if you do.
 nav:
   - Home: index.md
   - API reference: api.md
+
+# What `--strict` catches. Every row was built against the pinned zensical and watched, not
+# taken from what a strict mkdocs build used to do:
+#
+#   caught  link to a page that is not there   [text](gone.md)
+#   caught  dead anchor                        [text](api.md#gone)
+#   caught  unresolved mkdocstrings reference  [`pkg.Thing`][pkg.Thing]
+#   MISSED  nav: entry naming a missing file     - Gone: gone.md
+#   MISSED  absolute link                      [text](/gone/)
+#   MISSED  link with no `.md` extension       [text](api)
+#
+# Nothing below fixes the three MISSED rows and no setting does: zensical validates links
+# and not the nav, and it drops mkdocs' `absolute_links:` and `unrecognized_links:` keys in
+# silence, so writing them in would look like a check and be none. Read those three rows as
+# work for a human. Row three needs the mkdocstrings plugin, so a repo without one is down
+# to two.
+#
+# `not_found:` and `anchors:` are zensical's defaults, spelled out because they are the two
+# keys mkdocs also understands. The five under them are zensical's own and mkdocs rejects
+# them, so a move back to mkdocs deletes this block as well as the pixi lines.
+# `unresolved_references:` is left off on purpose: it reads any bracketed word in prose,
+# `[draft]`, as a broken link reference and fails the build on it.
+validation:
+  links:
+    not_found: warn
+    anchors: warn
+  unresolved_footnotes: true
+  unused_definitions: true
+  unused_footnotes: true
+  shadowed_definitions: true
+  shadowed_footnotes: true
 
 theme:
   name: material
