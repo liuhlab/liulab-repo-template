@@ -5,8 +5,11 @@ Write the docstring; this page follows.
 
 ## The examples are tests
 
-Give every public object an `Examples` block. `pixi run check` runs those blocks, so an
-example that no longer matches its code fails the tests.
+`pixi run check` runs the `Examples` blocks in `src/newpkg/`, so an example that no longer
+matches its code fails the tests.
+
+Write one where it makes the object easier to use, and leave it out where it would not.
+An example nobody keeps up to date is worse than none.
 
 Keep an example cheap, offline and deterministic. It has to give the same answer on any
 machine, with no network. A line that cannot do that needs `# doctest: +SKIP` at the end of

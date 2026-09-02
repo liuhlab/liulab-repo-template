@@ -39,8 +39,10 @@ sets one.
   `init-repo` deletes them, takes `-f mkdocs.template.yml` off the two docs tasks, and cuts
   the front page's pointer at the page.
 - Docstring examples as tests. `pytest` collects the doctests in `src/` alongside `tests/`,
-  so an example that has drifted from the code it documents fails the gate. `docs/api.md`
-  says how to mark a line that cannot run offline.
+  so an example that has drifted from the code it documents fails the gate. Writing an
+  example is voluntary; the ones that exist are checked. `docs/api.md` says how to mark a
+  line that cannot run offline. Collecting `src/` imports it, so a module that needs an
+  absent optional dependency costs one error instead of aborting the whole suite.
 - A `validation:` block in `mkdocs.yml` turning on the five link checks the site builder
   ships switched off, and a comment beside it listing, from measurement, which broken links
   a strict build catches and which three it lets through. A `nav:` entry naming a file that

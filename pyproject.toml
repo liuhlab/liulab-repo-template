@@ -173,7 +173,17 @@ reportMissingParameterType = "none"
 # `src` is collected for its docstring examples alone: `--doctest-modules` runs them, so an
 # example that has drifted from the code it documents fails.
 testpaths = ["tests", "src"]
-addopts = ["-ra", "--strict-markers", "--strict-config", "--doctest-modules"]
+# `--continue-on-collection-errors` because collecting `src` IMPORTS every module in it. A
+# module needing an absent optional dependency — a plotting path, a CUDA path, a
+# platform-specific binding — used to abort collection and run zero tests. It now costs one
+# error. Measured: the run still exits non-zero, and a drifted example still fails (#66).
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--doctest-modules",
+    "--continue-on-collection-errors",
+]
 xfail_strict = true
 filterwarnings = ["error"]
 
