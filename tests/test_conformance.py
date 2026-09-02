@@ -1258,6 +1258,94 @@ def test_rule_13_does_not_flag_a_link_or_an_anchor(repo: Path) -> None:
     assert "mkdocs.yml: 2 nav entry(s) against docs/" in flat(proc.stdout)
 
 
+def test_rule_13_does_not_flag_an_entry_that_names_no_page(repo: Path) -> None:
+    # `- ...` is awesome-pages asking for the rest of the tree, not a file. The old rule resolved
+    # it to `docs/...` and told the reader to add that, which is what a rule looks like outside
+    # its domain. It is reported as unresolved instead, so a reader who expected it to be checked
+    # finds out here rather than believing it was.
+    write(repo, "mkdocs.yml", MKDOCS + "  - ...\n  - Generated: reference/\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["nav-target-exists"] == "ok"
+    assert "2 nav entry(s) name no page and were not resolved: ..., reference/" in flat(proc.stdout)
+
+
+def test_rule_13_still_fires_on_a_typo_beside_an_entry_that_names_no_page(repo: Path) -> None:
+    # The narrowing must not cost the rule its subject. `reference/` is passed over and `hnad.md`
+    # is not, because a typo still ends in `.md` — and this tree needed a waiver before, which
+    # would have suppressed both.
+    write(repo, "mkdocs.yml", MKDOCS + "  - API: reference/\n  - Typo: hnad.md\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["nav-target-exists"] == "FAIL"
+    assert "nav entry `hnad.md` names docs/hnad.md, which is not tracked" in proc.stderr
+    # One problem, not two: the entry naming no page contributed none.
+    assert "nav-target-exists FAIL 1 problem(s)" in flat(proc.stdout)
+
+
+def test_rule_13_is_vacuous_where_a_plugin_writes_pages_during_the_build(repo: Path) -> None:
+    # The shape that used to need a waiver on first contact. Waivers are per RULE, so a repo with
+    # one generated section turned rule 13 off for every hand-written entry it exists to protect
+    # — measured, two problems suppressed where one was a real dead link. The rule has no premise
+    # here, and saying so leaves the waiver table for a decision somebody actually made.
+    write(
+        repo,
+        "mkdocs.yml",
+        "site_name: example\n"
+        "plugins:\n"
+        "  - search\n"
+        "  - gen-files:\n"
+        "      scripts: [docs/gen_ref.py]\n"
+        "nav:\n"
+        "  - Home: index.md\n"
+        "  - API: reference/SUMMARY.md\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["nav-target-exists"] == "--"
+    assert "not checked: mkdocs.yml declares gen-files" in flat(proc.stdout)
+
+
+def test_rule_13_reads_the_mapping_spelling_of_plugins(repo: Path) -> None:
+    # `plugins:` is a list of names, or a mapping of name to options. A reader that knew one
+    # spelling would fail every generated entry in a repo that wrote the other — the false
+    # failure this narrowing exists to remove, back again through the parser.
+    write(
+        repo,
+        "mkdocs.yml",
+        "site_name: example\n"
+        "plugins:\n"
+        "  literate-nav:\n"
+        "    nav_file: SUMMARY.md\n"
+        "nav:\n"
+        "  - Home: index.md\n"
+        "  - API: reference/SUMMARY.md\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["nav-target-exists"] == "--"
+    assert "not checked: mkdocs.yml declares literate-nav" in flat(proc.stdout)
+
+
+def test_rule_13_strips_an_anchor_before_resolving_a_page(repo: Path) -> None:
+    # `api.md#install` names `api.md`, at a place on it. The whole string is not a path and never
+    # was, so the old rule reported `docs/api.md#install` missing while the page was right there.
+    write(repo, "mkdocs.yml", MKDOCS + "  - Install: api.md#install\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["nav-target-exists"] == "ok"
+    assert "mkdocs.yml: 2 nav entry(s) against docs/" in flat(proc.stdout)
+
+
+def test_rule_13_fires_on_a_missing_page_named_with_an_anchor(repo: Path) -> None:
+    # Stripping the anchor is what keeps this one checked: the page is what has to be there.
+    write(repo, "mkdocs.yml", MKDOCS + "  - Ghost: ghost.md#gone\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["nav-target-exists"] == "FAIL"
+    assert "nav entry `ghost.md#gone` names docs/ghost.md, which is not tracked" in proc.stderr
+
+
 def test_rule_13_fires_on_a_page_that_exists_but_sits_outside_the_site_source(repo: Path) -> None:
     # The second class, and the reason it is the same rule rather than a separate concern:
     # `README.md` really is there, so a check that only asked whether the file exists would call

@@ -103,6 +103,13 @@ DEFAULT_DOCS_DIR = "docs"
 #: site from one docs tree: a second configuration `INHERIT`s the first and APPENDS to its nav,
 #: and the navbar the build renders carries the entries of both. A repo with one configuration
 #: reads one, and this costs nothing.
+#:
+#: Every one of them INCLUDING a local overlay no task builds, which is the known cost. Reading
+#: instead only the configurations a declared docs task names with `-f` was considered and
+#: declined: pixi writes a task as a string, as `{cmd = "..."}` or as a list, so it needs a second
+#: command-line parser beside rule 12's, and it would stop reading a configuration built by a
+#: Makefile or a workflow rather than by a task. A rule that reads one file too many is the
+#: cheaper error here.
 _SITE_CONFIG_RE = re.compile(r"^mkdocs(?:\..+)?\.ya?ml$")
 
 #: Where GitHub reads workflows, and the two file endings it accepts. Nothing below this
@@ -398,15 +405,23 @@ class SiteConfig:
         Whether the file has a `nav:` key at all. A configuration with none is not one whose nav
         is empty — the generator builds the navbar from the directory tree instead — so a rule
         reports it as unchecked rather than green.
+    generators
+        The page-generating plugins this file declares, along `INHERIT`, in name order. A
+        configuration with one builds pages nothing tracks, so its nav cannot be resolved
+        against a checkout at all.
     targets
-        Repo-relative path -> the nav string that named it, for every entry that names a page
-        rather than a link or a bare anchor.
+        Repo-relative path -> the nav string that named it, for every entry that names a page.
+    unresolved
+        The entries that name no page and no link — a directory, an `...` — as written. Not a
+        problem and not a target: the rule says it did not resolve them.
     """
 
     path: str
     docs_dir: str
     declares_nav: bool
+    generators: tuple[str, ...]
     targets: dict[str, str]
+    unresolved: tuple[str, ...]
 
 
 @dataclass
@@ -462,13 +477,12 @@ class Repo:
             loaded = None
         return loaded if isinstance(loaded, dict) else {}
 
-    def resolved_docs_dir(self, rel: str) -> str:
-        """One configuration's site source, resolved along the `INHERIT` chain.
+    def inherit_chain(self, rel: str) -> Iterator[dict[str, Any]]:
+        """One configuration and every one it `INHERIT`s, nearest first.
 
-        Walked rather than read from the one file, because a configuration that inherits another
-        and declares no `docs_dir` of its own uses the parent's, and reading only the child would
-        resolve its nav against a directory that is not the site source. `INHERIT` is a path
-        relative to the configuration that writes it.
+        `INHERIT` is a path relative to the configuration that writes it. Anything a child does
+        not declare it takes from the parent, so a rule reading the child alone reads half a
+        configuration.
 
         The visited set is not defensive clutter: a cycle is a configuration nobody can build, and
         it must not be a conformance crash either.
@@ -477,14 +491,33 @@ class Repo:
         while rel not in seen:
             seen.add(rel)
             document = self.config(rel)
+            yield document
+            parent = document.get("INHERIT")
+            if not isinstance(parent, str):
+                return
+            rel = posixpath.normpath(posixpath.join(posixpath.dirname(rel), parent))
+
+    def resolved_docs_dir(self, rel: str) -> str:
+        """One configuration's site source, resolved along the `INHERIT` chain.
+
+        Walked rather than read from the one file, because a configuration that inherits another
+        and declares no `docs_dir` of its own uses the parent's, and reading only the child would
+        resolve its nav against a directory that is not the site source.
+        """
+        for document in self.inherit_chain(rel):
             declared = document.get("docs_dir")
             if isinstance(declared, str):
                 return posixpath.normpath(declared).strip("/")
-            parent = document.get("INHERIT")
-            if not isinstance(parent, str):
-                break
-            rel = posixpath.normpath(posixpath.join(posixpath.dirname(rel), parent))
         return DEFAULT_DOCS_DIR
+
+    def page_generators(self, rel: str) -> tuple[str, ...]:
+        """Every page-generating plugin one configuration declares, along the `INHERIT` chain.
+
+        Walked for the same reason the site source is: a child that inherits a parent declaring
+        `gen-files` builds the same generated pages, and its own nav names them.
+        """
+        declared = {name for document in self.inherit_chain(rel) for name in _plugins(document)}
+        return tuple(sorted(declared & PAGE_GENERATORS))
 
     @cached_property
     def mkdocs(self) -> dict[str, Any]:
@@ -499,7 +532,8 @@ class Repo:
     @cached_property
     def nav(self) -> dict[str, str]:
         """Repo-relative path -> the `mkdocs.yml` nav entry that names it."""
-        return _nav_targets(self.docs_dir, self.mkdocs.get("nav"))
+        targets, _ = _nav_targets(self.docs_dir, self.mkdocs.get("nav"))
+        return targets
 
     @cached_property
     def site_configs(self) -> tuple[SiteConfig, ...]:
@@ -515,6 +549,12 @@ class Repo:
         other's dead entry, and a rule merging them into a single nav would have to know which
         file won; the union needs neither, because an entry is checked where it was written. A
         repo with one configuration reads one, and this costs nothing.
+
+        The join is ZENSICAL's: it merges an inherited configuration with `deepmerge`'s
+        `always_merger`, which CONCATENATES lists. mkdocs' own `INHERIT` replaces them, so a repo
+        that takes ADR 0001's fallback back to mkdocs has a child nav that wins outright — and
+        the union then checks entries no build renders. It would report a dead entry in a file
+        that is no longer read, which is a false failure. Revisit this with the generator.
         """
         found: list[SiteConfig] = []
         for rel in self.tracked:
@@ -522,12 +562,15 @@ class Repo:
                 continue
             document = self.config(rel)
             docs_dir = self.resolved_docs_dir(rel)
+            targets, unresolved = _nav_targets(docs_dir, document.get("nav"))
             found.append(
                 SiteConfig(
                     path=rel,
                     docs_dir=docs_dir,
                     declares_nav="nav" in document,
-                    targets=_nav_targets(docs_dir, document.get("nav")),
+                    generators=self.page_generators(rel),
+                    targets=targets,
+                    unresolved=unresolved,
                 )
             )
         return tuple(found)
@@ -606,9 +649,33 @@ def _walk_strings(node: Any) -> Iterator[str]:
 #: is a file that can be missing. The scheme half is what covers `mailto:`, which has no `//`.
 _NAV_LINK_RE = re.compile(r"^[a-z][a-z0-9+.\-]*:|^//|^#", re.IGNORECASE)
 
+#: The anchor a nav entry may carry — `guide.md#install` names `guide.md`, and the anchor is a
+#: place on it. A bare `#top` never reaches this, being a link by the rule above.
+_ANCHOR_RE = re.compile(r"#.*$")
 
-def _nav_targets(docs_dir: str, nav: Any) -> dict[str, str]:
-    """Repo-relative path -> the `nav:` entry that named it, for one site configuration.
+#: What a nav entry has to end in to name a PAGE. Markdown, a notebook where the repo has the
+#: plugin that renders one, and an HTML file the builder passes through.
+#:
+#: An entry ending in anything else names something this cannot resolve and must not guess at:
+#: `- API: reference/` is a directory `literate-nav` expands, `- ...` is `awesome-pages` asking
+#: for the rest of the tree. Both were measured failing rule 13, and the fix it printed for the
+#: second — "add docs/..." — is what a rule looks like outside its domain. A typo is unaffected:
+#: `hnad.md` still ends in `.md`.
+PAGE_SUFFIXES = (".md", ".ipynb", ".html")
+
+#: The plugins that WRITE PAGES into the site source while the build runs. A nav entry naming one
+#: of them resolves to nothing a checkout carries, so rule 13 has no premise in a repo that
+#: declares one and reports itself vacuous instead.
+#:
+#: That replaces a waiver, and the difference is the point. Waivers are per RULE, which is right
+#: for an all-or-nothing rule and wrong for this one: a repo with a single generated section had
+#: to turn rule 13 off for every hand-written entry it exists to protect, and the waiver then
+#: swallowed the genuine dead links too — measured, two problems suppressed where one was real.
+PAGE_GENERATORS = frozenset({"gen-files", "literate-nav", "awesome-pages", "macros"})
+
+
+def _nav_targets(docs_dir: str, nav: Any) -> tuple[dict[str, str], tuple[str, ...]]:
+    """One configuration's nav, read apart: the pages it names, and the entries that name none.
 
     Nav paths are relative to `docs_dir`, so they are prefixed with it before they can be compared
     with anything `git ls-files` said. Getting that wrong is not a false negative that shows up
@@ -617,13 +684,41 @@ def _nav_targets(docs_dir: str, nav: Any) -> dict[str, str]:
     Rules 2 and 13 read the same mapping, so what counts as a nav path is decided once. `normpath`
     is what lets rule 13 see an entry reaching ABOVE the site source: `../README.md` under `docs/`
     arrives here as `README.md`, outside the directory the builder copies.
+
+    The second half is everything that is neither a link nor a page — the entries a rule should
+    say it did not resolve rather than report as missing.
     """
     targets: dict[str, str] = {}
+    unresolved: list[str] = []
     for raw in _walk_strings(nav):
         if _NAV_LINK_RE.match(raw):
             continue
-        targets[posixpath.normpath(f"{docs_dir or '.'}/{raw}")] = raw
-    return targets
+        path = _ANCHOR_RE.sub("", raw)
+        if not path.endswith(PAGE_SUFFIXES):
+            unresolved.append(raw)
+            continue
+        targets[posixpath.normpath(f"{docs_dir or '.'}/{path}")] = raw
+    return targets, tuple(unresolved)
+
+
+def _plugins(document: dict[str, Any]) -> set[str]:
+    """Every plugin name one site configuration declares.
+
+    Both spellings: a LIST, whose items are bare names or single-key mappings carrying options,
+    and a MAPPING of name to options. A theme-namespaced name — `material/search` — is that
+    theme's copy of the plugin, so the last segment is the name.
+    """
+    declared = document.get("plugins")
+    names: list[Any] = []
+    if isinstance(declared, list):
+        for item in declared:  # pyright: ignore[reportUnknownVariableType]
+            if isinstance(item, str):
+                names.append(item)
+            elif isinstance(item, dict):
+                names.extend(item)  # pyright: ignore[reportUnknownArgumentType]
+    elif isinstance(declared, dict):
+        names.extend(declared)  # pyright: ignore[reportUnknownArgumentType]
+    return {str(name).rsplit("/", 1)[-1] for name in names}
 
 
 def _task_names(node: Any) -> Iterator[str]:
@@ -1490,12 +1585,15 @@ def rule_workflow_step_tasks(repo: Repo) -> Result:
 
 
 def rule_nav_target_exists(repo: Repo) -> Result:
-    """13. Every `nav:` entry names a tracked page under that configuration's site source.
+    """13. Every `nav:` entry that names a page names a tracked one, under the site source.
 
-    TRACKED and not merely present, because CI builds from a checkout. The one shape that
-    legitimately fails is a repo GENERATING pages into the site source at build time, whose
-    entries name nothing this can see; `[tool.liulab.waived]` is the answer there, and it is
-    printed on every run so the choice stays visible.
+    TRACKED and not merely present, because CI builds from a checkout.
+
+    Two shapes are outside it rather than waived. An entry that names no page at all — a
+    directory, an `...` — is reported unresolved, because a rule that cannot tell what a menu
+    item points at cannot say the page is missing. And a configuration declaring a plugin that
+    WRITES pages during the build has no premise here at all: nothing it names is in a checkout,
+    so the rule reports itself vacuous rather than failing every generated entry.
     """
     result = Result()
     if not repo.site_configs:
@@ -1513,6 +1611,17 @@ def rule_nav_target_exists(repo: Repo) -> Result:
             result.notes.append(
                 f"not checked: {config.path} declares no `nav:`, so the site builds its navbar "
                 "from the directory tree and names no page for this rule to resolve"
+            )
+            continue
+        # A page-generating plugin is the shape that used to need a waiver. The pages it writes
+        # exist after the build and never in the checkout this reads, so the rule has no premise
+        # rather than a repo to fail — and saying so leaves the waiver table free for a decision
+        # somebody actually made.
+        if config.generators:
+            result.notes.append(
+                f"not checked: {config.path} declares {', '.join(config.generators)}, which "
+                "writes pages into the site source while the build runs, so a nav entry may name "
+                "a page no checkout carries"
             )
             continue
         prefix = f"{config.docs_dir}/" if config.docs_dir not in {"", "."} else ""
@@ -1555,6 +1664,13 @@ def rule_nav_target_exists(repo: Repo) -> Result:
         result.notes.append(
             f"{config.path}: {len(config.targets)} nav entry(s) against {prefix or 'the repo root'}"
         )
+        # Said out loud rather than passed over. These are the entries the rule declined to
+        # resolve, and a reader who expected one of them to be checked should find out here.
+        if config.unresolved:
+            result.notes.append(
+                f"{config.path}: {len(config.unresolved)} nav entry(s) name no page and were not "
+                f"resolved: {', '.join(config.unresolved)}"
+            )
     return result
 
 
@@ -1686,9 +1802,11 @@ RULES: tuple[Rule, ...] = (
     Rule(
         13,
         "nav-target-exists",
-        "every `nav:` entry in every tracked site configuration names a tracked file under that "
-        "configuration's site source. This is the one broken site the generator does not validate "
-        "at all — it builds green, reports no issues, and publishes a menu item that 404s",
+        "every `nav:` entry that names a page — `.md`, `.ipynb`, `.html` — names a tracked one "
+        "under that configuration's site source. This is the one broken site the generator does "
+        "not validate at all: it builds green, reports no issues, and publishes a menu item that "
+        "404s. An entry naming no page, and a configuration whose plugins write pages during the "
+        "build, are reported unchecked rather than failed",
         rule_nav_target_exists,
     ),
     Rule(

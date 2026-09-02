@@ -85,6 +85,15 @@ sets one.
   take a separate value was measured off `pixi run --help` and had eight spellings of twelve
   options, so `pixi run -p linux-64 build` — a step that literally is `pixi run <task>` — was
   being told it ran a command.
+- The conformance rule about `nav:` entries now resolves only the entries that name a page —
+  ending `.md`, `.ipynb` or `.html` — and strips a trailing `#anchor` first. A directory entry,
+  an `...`, and `guide.md#install` were each measured failing a correct site, and the fix printed
+  for the second was "add docs/...". Whatever it did not resolve is listed in the notes, so a
+  passed-over entry is visible rather than silently uncounted.
+- A site configuration that declares a page-generating plugin — `gen-files`, `literate-nav`,
+  `awesome-pages`, `macros` — now reports that rule not checked, with the reason. Such a repo had
+  to waive the whole rule on first contact, and a waiver is per rule: one generated section
+  turned the check off for every hand-written entry it exists to protect, dead links included.
 - `ci.yml`'s header no longer says CI and a laptop cannot drift. The rule reads the `run:` line
   and nothing else, so `env:`, `working-directory:`, `shell:` and a local composite action can
   each change what a step does without changing that line. Those limits are now written down in
