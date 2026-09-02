@@ -5,7 +5,7 @@
     python scripts/conformance.py [--root PATH]
 
 It states the RULE, not the file contents — a pull model, so a repo that legitimately diverges
-stays green while the shared conventions stay checked. Ten rules: eight fail, two only warn.
+stays green while the shared conventions stay checked. Eleven rules: nine fail, two only warn.
 
 Three things it does on purpose:
 
@@ -82,6 +82,50 @@ _SKILL_FILE_RE = re.compile(r"^skills/[^/]+/SKILL\.md$")
 _SKILL_DIR_RES = (
     re.compile(r"^skills/(?P<name>[^/]+)/"),
     re.compile(r"^\.(?:claude|agents)/skills/(?P<name>[^/]+)(?:/|$)"),
+)
+
+
+@dataclass(frozen=True)
+class SecondToolchain:
+    """One toolchain other than pixi, and where it would declare a dependency version.
+
+    Attributes
+    ----------
+    tool
+        The tool named in the failure, and listed in the note that says what was looked for.
+    path
+        A regex FULL-matched against a repo-relative tracked path. A pattern with no `/` in it
+        therefore matches at the repo root and nowhere else, which is where a resolver reads:
+        `tests/fixtures/requirements.txt` is a test's input, not this repo's dependencies.
+    table
+        A dotted table in `pyproject.toml`, for a tool that declares versions in the manifest
+        instead of a file of its own — a second build backend's dependency section.
+    """
+
+    tool: str
+    path: str = ""
+    table: str = ""
+
+
+#: Every second place a dependency version can be declared. Rule 10 reads this and nothing else,
+#: so covering one more tool is one more line here.
+#:
+#: It is a constant and not a `[tool.liulab.*]` key because it is not a claim a repo makes about
+#: itself: the rule is the same in every Liu Lab repo, and a repo that must keep one of these has
+#: `[tool.liulab.waived]`, which is printed on every run. A manifest list could be emptied
+#: instead, and an escape hatch nobody can see is the thing this file exists to prevent.
+#:
+#: Lockfiles are named per tool, never `*.lock`: `pixi.lock` is the lock this rule protects.
+#: `setup.cfg` is absent because it commonly carries only tool configuration and no dependency.
+SECOND_TOOLCHAINS: tuple[SecondToolchain, ...] = (
+    SecondToolchain("pre-commit", path=r"\.pre-commit-config\.ya?ml"),
+    SecondToolchain("pip", path=r"[^/]*requirements[^/]*\.txt|requirements/[^/]+\.txt"),
+    SecondToolchain("conda", path=r"[^/]*environment[^/]*\.ya?ml"),
+    SecondToolchain("pipenv", path=r"Pipfile(\.lock)?"),
+    SecondToolchain("setuptools", path=r"setup\.py"),
+    SecondToolchain("poetry", path=r"poetry\.lock", table="tool.poetry"),
+    SecondToolchain("uv", path=r"uv\.lock", table="tool.uv"),
+    SecondToolchain("pdm", path=r"pdm\.lock", table="tool.pdm"),
 )
 
 
@@ -196,6 +240,11 @@ class Repo:
             entries[posixpath.normpath(f"{self.docs_dir}/{raw}")] = raw
         return entries
 
+    @cached_property
+    def manifest(self) -> dict[str, Any]:
+        """`pyproject.toml`, parsed. `load` refused to build this repo unless it parses."""
+        return tomllib.loads(self.read("pyproject.toml") or "")
+
 
 def _walk_strings(node: Any) -> Iterator[str]:
     """Every string value in a `nav:` tree, at any depth.
@@ -291,8 +340,18 @@ def _glossary_entries(text: str) -> list[tuple[str, int]]:
     return entries
 
 
+def _has_table(manifest: dict[str, Any], dotted: str) -> bool:
+    """Whether a dotted table — `tool.poetry` — is present in a parsed manifest."""
+    node: Any = manifest
+    for part in dotted.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return False
+        node = node[part]
+    return True
+
+
 # --------------------------------------------------------------------------------------
-# The rules. Eight fail, two warn. Each returns what it found; nothing here exits or prints.
+# The rules. Nine fail, two warn. Each returns what it found; nothing here exits or prints.
 # --------------------------------------------------------------------------------------
 
 
@@ -612,6 +671,48 @@ def warning_init_sentinel(repo: Repo) -> Result:
     return result
 
 
+def rule_single_toolchain(repo: Repo) -> Result:
+    """10. No second toolchain is configured: pixi and the manifest are the only ones."""
+    result = Result()
+    # One why for every marker, because it is one failure: the class, not the tool.
+    why = (
+        "two resolvers can disagree, and it fails silently rather than loudly: a version "
+        "declared here is one `pixi.lock` never sees, so an environment built from it and the "
+        "environment the gate runs in differ while both look correct. pyproject.toml is the "
+        "single source of truth for dependencies, environments and tasks"
+    )
+    for marker in SECOND_TOOLCHAINS:
+        if marker.path:
+            for rel in repo.tracked:
+                if re.fullmatch(marker.path, rel):
+                    result.problems.append(
+                        _problem(
+                            f"{rel} declares dependencies for {marker.tool}, a second toolchain",
+                            why,
+                            f"delete {rel} and declare what it pinned in pyproject.toml — "
+                            "`[tool.pixi.dependencies]` for a package, `[tool.pixi.tasks]` for a "
+                            "command — then run `pixi install`",
+                        )
+                    )
+        if marker.table and _has_table(repo.manifest, marker.table):
+            result.problems.append(
+                _problem(
+                    f"pyproject.toml has [{marker.table}], which configures {marker.tool}",
+                    why,
+                    f"delete [{marker.table}] and every table under it, declare what it pinned "
+                    "under `[tool.pixi.dependencies]`, then run `pixi install`",
+                )
+            )
+    # This rule is never vacuous — the list is always there and so is the manifest — but a run
+    # still has to say WHICH second toolchains it knew to look for, or a green means nothing.
+    names = ", ".join(marker.tool for marker in SECOND_TOOLCHAINS)
+    result.notes.append(
+        f"{len(SECOND_TOOLCHAINS)} second toolchain(s) looked for across "
+        f"{len(repo.tracked)} tracked path(s) and pyproject.toml: {names}"
+    )
+    return result
+
+
 @dataclass(frozen=True)
 class Rule:
     """One rule, its number, and the one-line statement printed when it fails."""
@@ -683,11 +784,18 @@ RULES: tuple[Rule, ...] = (
         warning_init_sentinel,
         warns_only=True,
     ),
+    Rule(
+        10,
+        "single-toolchain",
+        "no second toolchain is configured — no pre-commit config, requirements file, conda "
+        "environment or foreign resolver's table declares a version the pixi lock never sees",
+        rule_single_toolchain,
+    ),
 )
 
-#: Warning 10 is not a rule with a tree to inspect: it is the waiver table itself, printed on
+#: Warning 11 is not a rule with a tree to inspect: it is the waiver table itself, printed on
 #: every run. It lives in `report` because only the reporter knows what each waiver suppressed.
-WAIVER_RULE = (10, "waivers")
+WAIVER_RULE = (11, "waivers")
 
 
 def load(root: Path) -> Repo:
@@ -738,7 +846,7 @@ def _verdict(repo: Repo, rule: Rule, result: Result) -> tuple[str, list[str]]:
 
 
 def _waiver_lines(repo: Repo, results: list[tuple[Rule, Result]]) -> list[str]:
-    """Warning 10: every waiver, with what it actually suppressed.
+    """Warning 11: every waiver, with what it actually suppressed.
 
     A waiver naming no rule is called out rather than ignored, and so is one naming rule 1, which
     refuses to be waived. A waiver that quietly does nothing is the same invisible escape hatch
