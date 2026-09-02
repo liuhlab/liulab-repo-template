@@ -26,3 +26,6 @@ sets one.
   after this repo while the shipped config keeps the placeholder. Both are template-only:
   `init-repo` deletes them, takes `-f mkdocs.template.yml` off the two docs tasks, and cuts
   the front page's pointer at the page.
+- Docstring examples as tests. `pytest` collects the doctests in `src/` alongside `tests/`,
+  so an example that has drifted from the code it documents fails the gate. `docs/api.md`
+  says how to mark a line that cannot run offline.
