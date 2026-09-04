@@ -40,6 +40,7 @@ import tempfile
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -272,16 +273,26 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
         "tests": packaged,
         "docs/api.md": packaged,
         # Never subtracted, at any rung. `check_changelog` asks the other half of that: the
-        # file ships, and the entries under its heading are this repo's or nobody's.
+        # file ships, and the entries under its heading are this repo's or nobody's. The
+        # licence is asked the same two questions — it ships, and the year below is this
+        # repo's rather than the template's.
         "CHANGELOG.md": True,
         "AGENTS.md": True,
         "CONTEXT.md": True,
+        "LICENSE": True,
     }
     problems = [
         f"{rel} is {'missing' if wanted else 'still here'}"
         for rel, wanted in expected.items()
         if (stage / rel).exists() != wanted
     ]
+    # The year `init-repo` ran, read from the clock and not from `scripts/init_repo.py`. It
+    # bites the year after the template's own file was written, which is exactly when a stamp
+    # that stopped running would start shipping a stale licence.
+    licence = stage / "LICENSE"
+    copyright_line = f"Copyright (c) {date.today().year} Liu Lab"
+    if licence.is_file() and copyright_line not in licence.read_text(encoding="utf-8"):
+        problems.append(f"LICENSE does not say {copyright_line!r}, the year this render ran")
     workflow = (stage / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     if "dogfood" in workflow:
         problems.append("ci.yml still carries the dogfood job")

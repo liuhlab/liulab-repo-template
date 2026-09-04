@@ -55,6 +55,7 @@ import subprocess
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 #: The template's placeholder identity, SPELLED IN TWO PIECES for the reason
@@ -152,6 +153,11 @@ TASKS_A_PACKAGE_NEEDS = frozenset({'test = "pytest"', 'build = "python -m build"
 CLI_DEPENDENCY = "typer"
 CLI_PROJECT_DEPENDENCY = f'dependencies = ["{CLI_DEPENDENCY}>=0.12"]'
 CLI_PIXI_DEPENDENCY = f'{CLI_DEPENDENCY} = ">=0.12"'
+
+#: The licence's copyright line. The pattern matches whatever year the template shipped, and the
+#: rendered repo gets the year this ran — a year written once is a fact that goes stale and
+#: nothing rechecks it. The text itself is the MIT licence every other lab repo carries.
+LICENSE_COPYRIGHT = r"(?m)^Copyright \(c\) \d{4} Liu Lab$"
 
 #: Committing needs an identity, and a fresh runner has none configured.
 GIT_IDENTITY = ("-c", "user.name=init-repo", "-c", "user.email=init-repo@localhost")
@@ -1028,6 +1034,15 @@ class Init:
             ),
         )
 
+    def stamp_license(self) -> None:
+        """Date the licence to the year this ran, rather than the year the template shipped."""
+        year = date.today().year
+        self.edit(
+            "LICENSE",
+            "the copyright year",
+            lambda text: _sub(text, LICENSE_COPYRIGHT, f"Copyright (c) {year} Liu Lab"),
+        )
+
     def write_readme(self) -> None:
         """Replace the template's README with this repo's own."""
         if not self.approved("README.md"):
@@ -1294,6 +1309,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         init.say("skipped", "the rename — nothing tracked names the placeholder any more")
     init.describe()
+    init.stamp_license()
     init.write_readme()
     init.reset_changelog()
 
