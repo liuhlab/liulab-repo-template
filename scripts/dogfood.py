@@ -13,6 +13,13 @@ answers, then hand the result to its OWN gates — `pixi run check` and the docs
 assert what they cannot see. The rendered repo's own gate is the assertion, so almost nothing is
 asserted here.
 
+That gate runs over THIS repo's content, which is thin on purpose — research notes that quote
+nothing, a glossary of one term, a package of one function. So a green rung proves that
+`init-repo` subtracted correctly, and never that a gate behaves correctly on real material. No
+fixture corpus is coming: how a rule treats real material is a question for a test that writes
+the material it needs and removes it, the way `tests/test_quoted_evidence.py` does. See
+`docs/adr/0002-what-the-gate-does-not-check.md`.
+
 Two things about the scratch repo are deliberate:
 
 - It is **re-initialized, not cloned.** GitHub's template button creates a repo with one commit
