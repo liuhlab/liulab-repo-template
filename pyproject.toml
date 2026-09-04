@@ -204,7 +204,7 @@ filterwarnings = ["error"]
 # globs; a trailing `/` matches a directory. Values name the Vale Length rule, or `false`.
 [tool.liulab.agent-docs]
 "AGENTS.md" = "LengthDoc"
-"CONTEXT.md" = "LengthDoc"
+"CONTEXT.md" = false          # capped per entry by conformance, not per file
 "docs/agents/" = "LengthDoc"
 "skills/" = "LengthDoc"
 "docs/adr/" = "LengthAdr"

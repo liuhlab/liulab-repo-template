@@ -16,13 +16,16 @@ survives deletion without loss, delete it. The caps below are ceilings, not targ
 
 | Files | Cap |
 | --- | --- |
-| `AGENTS.md`, `CONTEXT.md`, `docs/agents/*`, `skills/*/SKILL.md` | 1000 (`Lab.LengthDoc`) |
+| `AGENTS.md`, `docs/agents/*`, `skills/*/SKILL.md` | 1000 (`Lab.LengthDoc`) |
 | `docs/adr/*` | 400 (`Lab.LengthAdr`) |
+| `CONTEXT.md` | 200 words per glossary entry, checked by `conformance` |
 | `docs/research/*` | none — research notes are long by nature |
 
-`CONTEXT.md` is capped a second way: **200 words per glossary entry**, checked by
-`conformance`, not by vale. A glossary grows one term at a time, so the file is the wrong
-unit to measure.
+`CONTEXT.md` has no file cap. A glossary grows one term at a time and never shrinks, so a
+file-level count measures how big the domain is, not how well the entries are written — a cap
+set for fourteen terms fires again at sixteen. The per-entry cap is the unit that matches, and
+it is the only one. What can go wrong with a long glossary is the number of entries, which no
+word cap was going to catch.
 
 **Measure with the gate, not with `wc`.** `wc -w` counts table pipes, link targets and
 shell flags as words; vale does not, and vale is what enforces the cap. The gap scales with
