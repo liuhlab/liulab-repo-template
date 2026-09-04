@@ -9,8 +9,11 @@ Three rules. Two are checked by `vale` in `pixi run check`; the third is on you.
 
 ## 1. Be concise
 
-Shorter beats longer — in documents, issues, commit messages, and replies. If a sentence
-survives deletion without loss, delete it. The caps below are ceilings, not targets.
+Shorter beats longer — in documents, issues, commit messages, replies, and code. If a
+sentence survives deletion without loss, delete it. The caps below are ceilings, not targets.
+
+Code's share of this rule is its comments and docstrings, which no cap reaches. `AGENTS.md`
+says what belongs in one and where each fact lives when it does not.
 
 ## 2. Agent-facing documents have word caps
 

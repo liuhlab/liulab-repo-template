@@ -4,15 +4,8 @@
 def greet(name: str = "world") -> str:
     """Return a greeting addressed to `name`.
 
-    Parameters
-    ----------
-    name
-        Who to greet.
-
-    Returns
-    -------
-    str
-        The greeting.
+    The numpydoc section form is demonstrated once here, by `Examples`; a function this small
+    would not normally carry a section at all.
 
     Examples
     --------
