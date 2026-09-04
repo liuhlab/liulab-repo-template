@@ -48,6 +48,7 @@ squashed, reads as fully modified, so it errs toward asking rather than deleting
 from __future__ import annotations
 
 import argparse
+import json
 import keyword
 import re
 import shutil
@@ -74,6 +75,21 @@ SHAPES = ("published", "not-published", "no-package")
 #: Used when a remote is a local path rather than a GitHub URL, which is what a scratch clone
 #: has. The lab account is the right guess and the site URL says so out loud.
 DEFAULT_OWNER = "liuhlab"
+
+#: The lab's label set, defined here and nowhere else — the wayfinder skill uses the
+#: `wayfinder:*` labels but declares no colour or description for any of them. GitHub copies no
+#: label when a repo is created from a template, so a new repo has the nine stock ones until
+#: someone clones these.
+LABEL_SOURCE = "liuhlab/liulab-repo-template"
+
+#: The `ci.yml` jobs each shape actually keeps. `no-package` deletes `test` and `build`, so a
+#: ruleset naming those would wait forever for a check that never reports, and every pull
+#: request in that repo would be unmergeable.
+SHAPE_CHECKS = {
+    "published": ("check", "test", "build", "docs"),
+    "not-published": ("check", "test", "build", "docs"),
+    "no-package": ("check", "docs"),
+}
 
 #: Deleted unconditionally, tolerated when absent, never checked against the first commit. This
 #: script is last, so everything else has already happened by the time it goes.
@@ -1167,8 +1183,57 @@ def readme(identity: Identity) -> str:
     return "\n".join(parts)
 
 
+def ruleset_body(checks: Sequence[str]) -> str:
+    """Build the ruleset a new repo's `main` gets: a pull request, and this shape's own checks.
+
+    Zero approvals, because a repo worked headlessly by agents has no second reviewer: what is
+    bought here is the pull request itself, which makes `pull_request` — the trigger that tests
+    the merge commit — the gate every change goes through.
+    """
+    return json.dumps(
+        {
+            "name": "main",
+            "target": "branch",
+            "enforcement": "active",
+            "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+            "rules": [
+                {
+                    "type": "pull_request",
+                    "parameters": {
+                        "required_approving_review_count": 0,
+                        "dismiss_stale_reviews_on_push": False,
+                        "require_code_owner_review": False,
+                        "require_last_push_approval": False,
+                        "required_review_thread_resolution": False,
+                        # Stated rather than left out: GitHub defaults this one to true, which
+                        # adds a reviewer nobody asked for and blocks a headless merge.
+                        "require_extra_approval_for_unattributed_changes": False,
+                    },
+                },
+                {
+                    "type": "required_status_checks",
+                    "parameters": {
+                        # False, so a branch does not have to be rebased onto `main` to merge.
+                        "strict_required_status_checks_policy": False,
+                        "required_status_checks": [{"context": check} for check in checks],
+                    },
+                },
+            ],
+        },
+        separators=(",", ":"),
+    )
+
+
 def next_steps(identity: Identity, tag: str | None, *, pushed: bool) -> list[str]:
-    """List what is left for a person to do, including the parts that are not in this repo."""
+    """List what is left for a person to do, including the parts that are not in this repo.
+
+    The last two steps are GitHub state rather than tree state, so they are handed over as
+    COMMANDS with this repo's own owner and name already in them. This script prints them and
+    does not run them: it shells out to `git` alone and reaches the network only under `--push`,
+    and calling `gh` here would buy a pure-local script an external tool, an unauthenticated
+    failure path, and two more ways to half-succeed. The reader is the `init-repo` agent, still
+    running, which has `gh`.
+    """
     steps = ["Run `/init` to write `AGENTS.md` for this repo, then delete the sentinel line."]
     if not pushed:
         steps.append("Push the branch" + (f" and `{tag}`." if tag else "."))
@@ -1179,6 +1244,17 @@ def next_steps(identity: Identity, tag: str | None, *, pushed: bool) -> list[str
             "environment `pypi`. There is no API token in this repo, and there must never be one."
         )
         steps.append("Publish a GitHub Release to release. Pushing a tag does not publish.")
+    checks = SHAPE_CHECKS[identity.shape]
+    steps.append(
+        "Clone the lab's labels — a template copies none, so `--label ready-for-agent` fails "
+        "until you do:\n"
+        f"gh label clone {LABEL_SOURCE} --force --repo {identity.owner}/{identity.repo}"
+    )
+    steps.append(
+        f"Require a pull request and this repo's own checks ({', '.join(checks)}) on `main`:\n"
+        f"echo '{ruleset_body(checks)}' | "
+        f"gh api --method POST repos/{identity.owner}/{identity.repo}/rulesets --input -"
+    )
     steps.append("Turn on GitHub Pages for the `gh-pages` branch to publish the site.")
     return steps
 
@@ -1326,7 +1402,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     print("\n  next\n")
     for step in next_steps(identity, tag, pushed=args.push):
-        init.say("todo", step)
+        # A step may carry a command under it, on its own line, so the command is copy-pasteable
+        # rather than buried in a sentence. Leading spaces are nothing to a shell.
+        first, *command = step.split("\n")
+        init.say("todo", first)
+        for line in command:
+            init.note(line)
     return 0
 
 

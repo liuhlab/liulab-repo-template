@@ -60,6 +60,9 @@ CONTEXT.md        the glossary — the words this repo uses
 bottom before fixing anything. The docs build is not part of `check`; it needs its own pixi
 environment and runs as its own CI job.
 
+Work on a branch and merge through a pull request: `pull_request` tests the merge commit,
+while a push to `main` tests it only once it has landed.
+
 ## Writing rules
 
 Three rules, all enforced by `vale`: be concise; agent-facing documents have word caps;

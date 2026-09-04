@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -70,6 +71,17 @@ TEMPLATE_ARTIFACTS = (
     "docs/template/index.md",
     "mkdocs.template.yml",
 )
+
+#: The two repo-settings commands `init-repo`'s closing checklist hands over, and the `ci.yml`
+#: jobs each shape keeps. Spelled out here rather than imported from `scripts/init_repo.py`, for
+#: the reason the constants above are: a check that reads its expectation out of the thing it is
+#: checking cannot tell a shape-correct list from one that drifted off the shapes.
+LABEL_COMMAND = "gh label clone liuhlab/liulab-repo-template --force --repo"
+SHAPE_CHECKS = {
+    "published": ["check", "test", "build", "docs"],
+    "not-published": ["check", "test", "build", "docs"],
+    "no-package": ["check", "docs"],
+}
 
 #: The `PIXI_*` variables a parent `pixi run` exports. They name the TEMPLATE's manifest, and a
 #: nested pixi that inherited them would check this repo instead of the rendered one.
@@ -118,14 +130,19 @@ RUNGS: tuple[Rung, ...] = (
 )
 
 
-def run(args: Sequence[str], cwd: Path, *, label: str) -> None:
-    """Run a command in a scratch repo, showing its output only when it fails."""
+def run(args: Sequence[str], cwd: Path, *, label: str) -> str:
+    """Run a command in a scratch repo, showing its output only when it fails.
+
+    Returns what it printed. Every caller but one discards that; `init_repo.py`'s is the closing
+    checklist, which is the only place the two repo-settings commands exist.
+    """
     env = {k: v for k, v in os.environ.items() if k not in PIXI_VARS}
     proc = subprocess.run(args, cwd=cwd, env=env, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         sys.stdout.write(proc.stdout)
         sys.stderr.write(proc.stderr)
         raise RenderError(f"{label} failed (exit {proc.returncode})")
+    return proc.stdout
 
 
 class RenderError(Exception):
@@ -251,6 +268,30 @@ def check_changelog(stage: Path) -> list[str]:
     ]
 
 
+def check_next_steps(rung: Rung, output: str) -> list[str]:
+    """Read the checklist `init_repo.py` printed: both repo-settings commands, filled in.
+
+    Neither one is in the tree, so no other check here can see them — the labels and the ruleset
+    are GitHub state, and the checklist is the part of that this repo owns. The required checks
+    are read back out of the command rather than matched as one literal string, because what
+    can drift is the LIST: `no-package` deletes the `test` and `build` jobs, and a ruleset
+    naming a job that never reports makes every pull request in that repo unmergeable.
+    """
+    problems: list[str] = []
+    slug = f"liuhlab/{rung.repo}"
+    if f"{LABEL_COMMAND} {slug}" not in output:
+        problems.append(f"the checklist does not hand over `{LABEL_COMMAND} {slug}`")
+    if f"repos/{slug}/rulesets" not in output:
+        problems.append(f"the checklist does not hand over a ruleset command for {slug}")
+    contexts = re.findall(r'"context":\s*"([^"]+)"', output)
+    if contexts != SHAPE_CHECKS[rung.shape]:
+        problems.append(
+            f"the ruleset command requires {contexts or 'nothing'}, "
+            f"and this shape has {SHAPE_CHECKS[rung.shape]}"
+        )
+    return problems
+
+
 def check_shape(rung: Rung, stage: Path) -> list[str]:
     """Check what the rendered repo's own gate cannot see: which files are and are not there."""
     packaged = rung.shape != "no-package"
@@ -304,7 +345,7 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
 def render(rung: Rung, parent: Path) -> None:
     """Render one rung and put the result through its own gate."""
     stage = build_scratch_repo(rung, parent)
-    run(
+    checklist = run(
         [sys.executable, str(stage / "scripts" / "init_repo.py"), *rung.answers],
         stage,
         label="init_repo.py",
@@ -322,6 +363,7 @@ def render(rung: Rung, parent: Path) -> None:
         + check_declined_cli(rung, stage)
         + check_template_artifacts(stage)
         + check_changelog(stage)
+        + check_next_steps(rung, checklist)
     )
     if problems:
         raise RenderError("\n".join(f"    {problem}" for problem in problems))
