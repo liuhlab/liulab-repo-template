@@ -24,9 +24,9 @@ Actions come in two kinds, and only one of them is dangerous:
 Exempt from that check, deleted unconditionally and tolerated when absent: the two skill
 directories, their four symlinks, the `dogfood` job and its task, `scripts/dogfood.py`, this
 file, the two files that publish this repo as the template — `docs/template/index.md` and the
-`mkdocs.template.yml` that names the site after it — and the template's own records, the ADR and
-the three research notes that say how the template was built. Their removal is the entire point,
-so nothing about them is negotiable.
+`mkdocs.template.yml` that names the site after it — and the template's own records, the two ADRs
+and the three research notes that say how the template was built and what its gate deliberately
+leaves alone. Their removal is the entire point, so nothing about them is negotiable.
 `CHANGELOG.md` is the one record handled the other way: the file always ships, and emptying it
 of the template's entries is guarded, so a late init never discards what someone wrote.
 
@@ -108,20 +108,26 @@ TEMPLATE_ONLY = (
     "scripts/init_repo.py",
 )
 
-#: The template's own records: the decision it made about its docs site, and the three notes
-#: behind the rules it ships. Same category as the two skills above — machinery whose removal is
-#: the point — so they go the same way, unconditionally and tolerated when absent.
+#: The template's own records: the two decisions it made about its own gate and docs site, and
+#: the three notes behind the rules it ships. Same category as the two skills above — machinery
+#: whose removal is the point — so they go the same way, unconditionally and tolerated when
+#: absent. A record whose subject is THIS repo is residue in a repo made from it, whatever it
+#: happens to number: `0002` reasons about `scripts/dogfood.py`, which the same render deletes.
 #:
 #: BY EXACT PATH, never by directory or glob. A repo initialized late may already have written
-#: `docs/adr/0002-*.md` or a research note of its own, and deleting `docs/adr/` would take it
+#: `docs/adr/0003-*.md` or a research note of its own, and deleting `docs/adr/` would take it
 #: with these. Both directories are allowed to disappear with their last file: `Repo.delete`
 #: prunes what it empties, and `docs/agents/domain.md` says `/domain-modeling` creates
 #: `docs/adr/` when it needs one and that a missing one is not an error. No `.gitkeep` — a
 #: tracked file whose only job is to exist is exactly the residue this script removes.
+#:
+#: Only `TEMPLATE_ADR` and `TEMPLATE_VALE_NOTE` are named, because only those two are cited
+#: again in `RECORD_POINTERS`. A record nothing else names stays a literal here.
 TEMPLATE_ADR = "docs/adr/0001-docs-site-on-zensical.md"
 TEMPLATE_VALE_NOTE = "docs/research/vale-setup-2026-08-30.md"
 TEMPLATE_RECORDS = (
     TEMPLATE_ADR,
+    "docs/adr/0002-what-the-gate-does-not-check.md",
     "docs/research/github-template-mechanics-2026-08-30.md",
     TEMPLATE_VALE_NOTE,
     "docs/research/zensical-viability-2026-08-30.md",

@@ -64,14 +64,15 @@ PLACEHOLDER = "new" + "pkg"
 #: them, each edited by a different anchor in `scripts/init_repo.py`.
 CLI_DEPENDENCY = "typer"
 
-#: What this repo says about ITSELF: its own records — how it chose its docs site, and the
-#: evidence behind the rules it ships — and the two files that publish it as the template, the
-#: page describing it and the config that names the site after it. Spelled out here rather than
-#: imported from `scripts/init_repo.py`, for the reason the two constants above are: an assertion
-#: that reads its expectation out of the thing it is checking cannot tell a deletion that ran
-#: from a list that quietly lost an entry.
+#: What this repo says about ITSELF: its own records — how it chose its docs site, what its gate
+#: deliberately does not check, and the evidence behind the rules it ships — and the two files
+#: that publish it as the template, the page describing it and the config that names the site
+#: after it. Spelled out here rather than imported from `scripts/init_repo.py`, for the reason
+#: the two constants above are: an assertion that reads its expectation out of the thing it is
+#: checking cannot tell a deletion that ran from a list that quietly lost an entry.
 TEMPLATE_ARTIFACTS = (
     "docs/adr/0001-docs-site-on-zensical.md",
+    "docs/adr/0002-what-the-gate-does-not-check.md",
     "docs/research/github-template-mechanics-2026-08-30.md",
     "docs/research/vale-setup-2026-08-30.md",
     "docs/research/zensical-viability-2026-08-30.md",

@@ -5,9 +5,13 @@ search:
 
 # What the gate deliberately does not check
 
-Three additions a review of the first repo made from this template proposed, and this repo
-declined. Each rests on a reason the workflow files do not carry, so a later review would
-otherwise re-propose it.
+Three additions to `liuhlab/liulab-repo-template`'s own gate, proposed by a review of the
+first repo made from it and declined here. Each rests on a reason the workflow files do not
+carry, so a later review would otherwise re-propose it.
+
+A record about this template is not about the repos made from it, so `init-repo` deletes this
+file along with ADR 0001 and the three research notes. A derived repo inherits the gate; the
+argument stays here.
 
 ## `docs.yml` is not chained to `ci.yml`
 
