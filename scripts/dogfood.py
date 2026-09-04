@@ -13,6 +13,13 @@ answers, then hand the result to its OWN gates — `pixi run check` and the docs
 assert what they cannot see. The rendered repo's own gate is the assertion, so almost nothing is
 asserted here.
 
+That gate runs over THIS repo's content, which is thin on purpose — research notes that quote
+nothing, a glossary of one term, a package of one function. So a green rung proves that
+`init-repo` subtracted correctly, and never that a gate behaves correctly on real material. No
+fixture corpus is coming: how a rule treats real material is a question for a test that writes
+the material it needs and removes it, the way `tests/test_quoted_evidence.py` does. See
+`docs/adr/0002-what-the-gate-does-not-check.md`.
+
 Two things about the scratch repo are deliberate:
 
 - It is **re-initialized, not cloned.** GitHub's template button creates a repo with one commit
@@ -33,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -40,6 +48,7 @@ import tempfile
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -55,20 +64,32 @@ PLACEHOLDER = "new" + "pkg"
 #: them, each edited by a different anchor in `scripts/init_repo.py`.
 CLI_DEPENDENCY = "typer"
 
-#: What this repo says about ITSELF: its own records — how it chose its docs site, and the
-#: evidence behind the rules it ships — and the two files that publish it as the template, the
-#: page describing it and the config that names the site after it. Spelled out here rather than
-#: imported from `scripts/init_repo.py`, for the reason the two constants above are: an assertion
-#: that reads its expectation out of the thing it is checking cannot tell a deletion that ran
-#: from a list that quietly lost an entry.
+#: What this repo says about ITSELF: its own records — how it chose its docs site, what its gate
+#: deliberately does not check, and the evidence behind the rules it ships — and the two files
+#: that publish it as the template, the page describing it and the config that names the site
+#: after it. Spelled out here rather than imported from `scripts/init_repo.py`, for the reason
+#: the two constants above are: an assertion that reads its expectation out of the thing it is
+#: checking cannot tell a deletion that ran from a list that quietly lost an entry.
 TEMPLATE_ARTIFACTS = (
     "docs/adr/0001-docs-site-on-zensical.md",
+    "docs/adr/0002-what-the-gate-does-not-check.md",
     "docs/research/github-template-mechanics-2026-08-30.md",
     "docs/research/vale-setup-2026-08-30.md",
     "docs/research/zensical-viability-2026-08-30.md",
     "docs/template/index.md",
     "mkdocs.template.yml",
 )
+
+#: The two repo-settings commands `init-repo`'s closing checklist hands over, and the `ci.yml`
+#: jobs each shape keeps. Spelled out here rather than imported from `scripts/init_repo.py`, for
+#: the reason the constants above are: a check that reads its expectation out of the thing it is
+#: checking cannot tell a shape-correct list from one that drifted off the shapes.
+LABEL_COMMAND = "gh label clone liuhlab/liulab-repo-template --force --repo"
+SHAPE_CHECKS = {
+    "published": ["check", "test", "build", "docs"],
+    "not-published": ["check", "test", "build", "docs"],
+    "no-package": ["check", "docs"],
+}
 
 #: The `PIXI_*` variables a parent `pixi run` exports. They name the TEMPLATE's manifest, and a
 #: nested pixi that inherited them would check this repo instead of the rendered one.
@@ -117,14 +138,19 @@ RUNGS: tuple[Rung, ...] = (
 )
 
 
-def run(args: Sequence[str], cwd: Path, *, label: str) -> None:
-    """Run a command in a scratch repo, showing its output only when it fails."""
+def run(args: Sequence[str], cwd: Path, *, label: str) -> str:
+    """Run a command in a scratch repo, showing its output only when it fails.
+
+    Returns what it printed. Every caller but one discards that; `init_repo.py`'s is the closing
+    checklist, which is the only place the two repo-settings commands exist.
+    """
     env = {k: v for k, v in os.environ.items() if k not in PIXI_VARS}
     proc = subprocess.run(args, cwd=cwd, env=env, capture_output=True, text=True, check=False)
     if proc.returncode != 0:
         sys.stdout.write(proc.stdout)
         sys.stderr.write(proc.stderr)
         raise RenderError(f"{label} failed (exit {proc.returncode})")
+    return proc.stdout
 
 
 class RenderError(Exception):
@@ -250,6 +276,30 @@ def check_changelog(stage: Path) -> list[str]:
     ]
 
 
+def check_next_steps(rung: Rung, output: str) -> list[str]:
+    """Read the checklist `init_repo.py` printed: both repo-settings commands, filled in.
+
+    Neither one is in the tree, so no other check here can see them — the labels and the ruleset
+    are GitHub state, and the checklist is the part of that this repo owns. The required checks
+    are read back out of the command rather than matched as one literal string, because what
+    can drift is the LIST: `no-package` deletes the `test` and `build` jobs, and a ruleset
+    naming a job that never reports makes every pull request in that repo unmergeable.
+    """
+    problems: list[str] = []
+    slug = f"liuhlab/{rung.repo}"
+    if f"{LABEL_COMMAND} {slug}" not in output:
+        problems.append(f"the checklist does not hand over `{LABEL_COMMAND} {slug}`")
+    if f"repos/{slug}/rulesets" not in output:
+        problems.append(f"the checklist does not hand over a ruleset command for {slug}")
+    contexts = re.findall(r'"context":\s*"([^"]+)"', output)
+    if contexts != SHAPE_CHECKS[rung.shape]:
+        problems.append(
+            f"the ruleset command requires {contexts or 'nothing'}, "
+            f"and this shape has {SHAPE_CHECKS[rung.shape]}"
+        )
+    return problems
+
+
 def check_shape(rung: Rung, stage: Path) -> list[str]:
     """Check what the rendered repo's own gate cannot see: which files are and are not there."""
     packaged = rung.shape != "no-package"
@@ -272,16 +322,26 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
         "tests": packaged,
         "docs/api.md": packaged,
         # Never subtracted, at any rung. `check_changelog` asks the other half of that: the
-        # file ships, and the entries under its heading are this repo's or nobody's.
+        # file ships, and the entries under its heading are this repo's or nobody's. The
+        # licence is asked the same two questions — it ships, and the year below is this
+        # repo's rather than the template's.
         "CHANGELOG.md": True,
         "AGENTS.md": True,
         "CONTEXT.md": True,
+        "LICENSE": True,
     }
     problems = [
         f"{rel} is {'missing' if wanted else 'still here'}"
         for rel, wanted in expected.items()
         if (stage / rel).exists() != wanted
     ]
+    # The year `init-repo` ran, read from the clock and not from `scripts/init_repo.py`. It
+    # bites the year after the template's own file was written, which is exactly when a stamp
+    # that stopped running would start shipping a stale licence.
+    licence = stage / "LICENSE"
+    copyright_line = f"Copyright (c) {date.today().year} Liu Lab"
+    if licence.is_file() and copyright_line not in licence.read_text(encoding="utf-8"):
+        problems.append(f"LICENSE does not say {copyright_line!r}, the year this render ran")
     workflow = (stage / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     if "dogfood" in workflow:
         problems.append("ci.yml still carries the dogfood job")
@@ -293,7 +353,7 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
 def render(rung: Rung, parent: Path) -> None:
     """Render one rung and put the result through its own gate."""
     stage = build_scratch_repo(rung, parent)
-    run(
+    checklist = run(
         [sys.executable, str(stage / "scripts" / "init_repo.py"), *rung.answers],
         stage,
         label="init_repo.py",
@@ -311,6 +371,7 @@ def render(rung: Rung, parent: Path) -> None:
         + check_declined_cli(rung, stage)
         + check_template_artifacts(stage)
         + check_changelog(stage)
+        + check_next_steps(rung, checklist)
     )
     if problems:
         raise RenderError("\n".join(f"    {problem}" for problem in problems))

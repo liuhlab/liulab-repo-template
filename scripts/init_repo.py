@@ -24,9 +24,9 @@ Actions come in two kinds, and only one of them is dangerous:
 Exempt from that check, deleted unconditionally and tolerated when absent: the two skill
 directories, their four symlinks, the `dogfood` job and its task, `scripts/dogfood.py`, this
 file, the two files that publish this repo as the template — `docs/template/index.md` and the
-`mkdocs.template.yml` that names the site after it — and the template's own records, the ADR and
-the three research notes that say how the template was built. Their removal is the entire point,
-so nothing about them is negotiable.
+`mkdocs.template.yml` that names the site after it — and the template's own records, the two ADRs
+and the three research notes that say how the template was built and what its gate deliberately
+leaves alone. Their removal is the entire point, so nothing about them is negotiable.
 `CHANGELOG.md` is the one record handled the other way: the file always ships, and emptying it
 of the template's entries is guarded, so a late init never discards what someone wrote.
 
@@ -48,6 +48,7 @@ squashed, reads as fully modified, so it errs toward asking rather than deleting
 from __future__ import annotations
 
 import argparse
+import json
 import keyword
 import re
 import shutil
@@ -55,6 +56,7 @@ import subprocess
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 #: The template's placeholder identity, SPELLED IN TWO PIECES for the reason
@@ -74,6 +76,21 @@ SHAPES = ("published", "not-published", "no-package")
 #: has. The lab account is the right guess and the site URL says so out loud.
 DEFAULT_OWNER = "liuhlab"
 
+#: The lab's label set, defined here and nowhere else — the wayfinder skill uses the
+#: `wayfinder:*` labels but declares no colour or description for any of them. GitHub copies no
+#: label when a repo is created from a template, so a new repo has the nine stock ones until
+#: someone clones these.
+LABEL_SOURCE = "liuhlab/liulab-repo-template"
+
+#: The `ci.yml` jobs each shape actually keeps. `no-package` deletes `test` and `build`, so a
+#: ruleset naming those would wait forever for a check that never reports, and every pull
+#: request in that repo would be unmergeable.
+SHAPE_CHECKS = {
+    "published": ("check", "test", "build", "docs"),
+    "not-published": ("check", "test", "build", "docs"),
+    "no-package": ("check", "docs"),
+}
+
 #: Deleted unconditionally, tolerated when absent, never checked against the first commit. This
 #: script is last, so everything else has already happened by the time it goes.
 TEMPLATE_ONLY = (
@@ -91,20 +108,26 @@ TEMPLATE_ONLY = (
     "scripts/init_repo.py",
 )
 
-#: The template's own records: the decision it made about its docs site, and the three notes
-#: behind the rules it ships. Same category as the two skills above — machinery whose removal is
-#: the point — so they go the same way, unconditionally and tolerated when absent.
+#: The template's own records: the two decisions it made about its own gate and docs site, and
+#: the three notes behind the rules it ships. Same category as the two skills above — machinery
+#: whose removal is the point — so they go the same way, unconditionally and tolerated when
+#: absent. A record whose subject is THIS repo is residue in a repo made from it, whatever it
+#: happens to number: `0002` reasons about `scripts/dogfood.py`, which the same render deletes.
 #:
 #: BY EXACT PATH, never by directory or glob. A repo initialized late may already have written
-#: `docs/adr/0002-*.md` or a research note of its own, and deleting `docs/adr/` would take it
+#: `docs/adr/0003-*.md` or a research note of its own, and deleting `docs/adr/` would take it
 #: with these. Both directories are allowed to disappear with their last file: `Repo.delete`
 #: prunes what it empties, and `docs/agents/domain.md` says `/domain-modeling` creates
 #: `docs/adr/` when it needs one and that a missing one is not an error. No `.gitkeep` — a
 #: tracked file whose only job is to exist is exactly the residue this script removes.
+#:
+#: Only `TEMPLATE_ADR` and `TEMPLATE_VALE_NOTE` are named, because only those two are cited
+#: again in `RECORD_POINTERS`. A record nothing else names stays a literal here.
 TEMPLATE_ADR = "docs/adr/0001-docs-site-on-zensical.md"
 TEMPLATE_VALE_NOTE = "docs/research/vale-setup-2026-08-30.md"
 TEMPLATE_RECORDS = (
     TEMPLATE_ADR,
+    "docs/adr/0002-what-the-gate-does-not-check.md",
     "docs/research/github-template-mechanics-2026-08-30.md",
     TEMPLATE_VALE_NOTE,
     "docs/research/zensical-viability-2026-08-30.md",
@@ -152,6 +175,11 @@ TASKS_A_PACKAGE_NEEDS = frozenset({'test = "pytest"', 'build = "python -m build"
 CLI_DEPENDENCY = "typer"
 CLI_PROJECT_DEPENDENCY = f'dependencies = ["{CLI_DEPENDENCY}>=0.12"]'
 CLI_PIXI_DEPENDENCY = f'{CLI_DEPENDENCY} = ">=0.12"'
+
+#: The licence's copyright line. The pattern matches whatever year the template shipped, and the
+#: rendered repo gets the year this ran — a year written once is a fact that goes stale and
+#: nothing rechecks it. The text itself is the MIT licence every other lab repo carries.
+LICENSE_COPYRIGHT = r"(?m)^Copyright \(c\) \d{4} Liu Lab$"
 
 #: Committing needs an identity, and a fresh runner has none configured.
 GIT_IDENTITY = ("-c", "user.name=init-repo", "-c", "user.email=init-repo@localhost")
@@ -1028,6 +1056,15 @@ class Init:
             ),
         )
 
+    def stamp_license(self) -> None:
+        """Date the licence to the year this ran, rather than the year the template shipped."""
+        year = date.today().year
+        self.edit(
+            "LICENSE",
+            "the copyright year",
+            lambda text: _sub(text, LICENSE_COPYRIGHT, f"Copyright (c) {year} Liu Lab"),
+        )
+
     def write_readme(self) -> None:
         """Replace the template's README with this repo's own."""
         if not self.approved("README.md"):
@@ -1152,8 +1189,57 @@ def readme(identity: Identity) -> str:
     return "\n".join(parts)
 
 
+def ruleset_body(checks: Sequence[str]) -> str:
+    """Build the ruleset a new repo's `main` gets: a pull request, and this shape's own checks.
+
+    Zero approvals, because a repo worked headlessly by agents has no second reviewer: what is
+    bought here is the pull request itself, which makes `pull_request` — the trigger that tests
+    the merge commit — the gate every change goes through.
+    """
+    return json.dumps(
+        {
+            "name": "main",
+            "target": "branch",
+            "enforcement": "active",
+            "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+            "rules": [
+                {
+                    "type": "pull_request",
+                    "parameters": {
+                        "required_approving_review_count": 0,
+                        "dismiss_stale_reviews_on_push": False,
+                        "require_code_owner_review": False,
+                        "require_last_push_approval": False,
+                        "required_review_thread_resolution": False,
+                        # Stated rather than left out: GitHub defaults this one to true, which
+                        # adds a reviewer nobody asked for and blocks a headless merge.
+                        "require_extra_approval_for_unattributed_changes": False,
+                    },
+                },
+                {
+                    "type": "required_status_checks",
+                    "parameters": {
+                        # False, so a branch does not have to be rebased onto `main` to merge.
+                        "strict_required_status_checks_policy": False,
+                        "required_status_checks": [{"context": check} for check in checks],
+                    },
+                },
+            ],
+        },
+        separators=(",", ":"),
+    )
+
+
 def next_steps(identity: Identity, tag: str | None, *, pushed: bool) -> list[str]:
-    """List what is left for a person to do, including the parts that are not in this repo."""
+    """List what is left for a person to do, including the parts that are not in this repo.
+
+    The last two steps are GitHub state rather than tree state, so they are handed over as
+    COMMANDS with this repo's own owner and name already in them. This script prints them and
+    does not run them: it shells out to `git` alone and reaches the network only under `--push`,
+    and calling `gh` here would buy a pure-local script an external tool, an unauthenticated
+    failure path, and two more ways to half-succeed. The reader is the `init-repo` agent, still
+    running, which has `gh`.
+    """
     steps = ["Run `/init` to write `AGENTS.md` for this repo, then delete the sentinel line."]
     if not pushed:
         steps.append("Push the branch" + (f" and `{tag}`." if tag else "."))
@@ -1164,6 +1250,17 @@ def next_steps(identity: Identity, tag: str | None, *, pushed: bool) -> list[str
             "environment `pypi`. There is no API token in this repo, and there must never be one."
         )
         steps.append("Publish a GitHub Release to release. Pushing a tag does not publish.")
+    checks = SHAPE_CHECKS[identity.shape]
+    steps.append(
+        "Clone the lab's labels — a template copies none, so `--label ready-for-agent` fails "
+        "until you do:\n"
+        f"gh label clone {LABEL_SOURCE} --force --repo {identity.owner}/{identity.repo}"
+    )
+    steps.append(
+        f"Require a pull request and this repo's own checks ({', '.join(checks)}) on `main`:\n"
+        f"echo '{ruleset_body(checks)}' | "
+        f"gh api --method POST repos/{identity.owner}/{identity.repo}/rulesets --input -"
+    )
     steps.append("Turn on GitHub Pages for the `gh-pages` branch to publish the site.")
     return steps
 
@@ -1294,6 +1391,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         init.say("skipped", "the rename — nothing tracked names the placeholder any more")
     init.describe()
+    init.stamp_license()
     init.write_readme()
     init.reset_changelog()
 
@@ -1310,7 +1408,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     print("\n  next\n")
     for step in next_steps(identity, tag, pushed=args.push):
-        init.say("todo", step)
+        # A step may carry a command under it, on its own line, so the command is copy-pasteable
+        # rather than buried in a sentence. Leading spaces are nothing to a shell.
+        first, *command = step.split("\n")
+        init.say("todo", first)
+        for line in command:
+            init.note(line)
     return 0
 
 

@@ -120,6 +120,13 @@ src = ["src", "tests", "scripts"]
 # No `target-version`: ruff infers it from `requires-python`.
 extend-exclude = [".pixi", "site", "build", "dist"]
 
+# ruff formats Python code blocks inside Markdown, and `docs/research/` quotes sources verbatim —
+# the reason `Lab.Jargon`, `Lab.Readability` and the agent-docs table already exempt it. On the
+# formatter alone, so `ruff check`'s reach is unchanged. Narrow, not `*.md`: a fence in README.md
+# is an example a reader copies.
+[tool.ruff.format]
+exclude = ["docs/research/**"]
+
 [tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
@@ -197,7 +204,7 @@ filterwarnings = ["error"]
 # globs; a trailing `/` matches a directory. Values name the Vale Length rule, or `false`.
 [tool.liulab.agent-docs]
 "AGENTS.md" = "LengthDoc"
-"CONTEXT.md" = "LengthDoc"
+"CONTEXT.md" = false          # capped per entry by conformance, not per file
 "docs/agents/" = "LengthDoc"
 "skills/" = "LengthDoc"
 "docs/adr/" = "LengthAdr"

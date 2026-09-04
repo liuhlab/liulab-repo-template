@@ -1,5 +1,6 @@
-# Word cap for agent-facing documents: AGENTS.md, CONTEXT.md, docs/agents/*,
-# skills/*/SKILL.md. The companion rule for ADRs is Lab.LengthAdr, at 400.
+# Word cap for agent-facing documents: AGENTS.md, docs/agents/*, skills/*/SKILL.md. The
+# companion rule for ADRs is Lab.LengthAdr, at 400. Not CONTEXT.md: a glossary only ever
+# grows, so conformance caps it per entry instead and no file cap applies.
 #
 # This is a dial, not a law. Raising it is a one-line diff here, made deliberately, with
 # the reason in the commit message. Do not raise it because a document ran long — that is

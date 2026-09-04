@@ -18,6 +18,11 @@ globs:
 
 config:
   default: true
+  # Scoped, not disabled. A hard tab in prose is an accident; inside a fenced block it is the
+  # content — `docs/research/` quotes a tab-indented record verbatim, the reason `Lab.Jargon`,
+  # `Lab.Readability` and the agent-docs table already exempt it.
+  MD010:
+    code_blocks: false
   # The formatter owns line length in code and nothing owns it in prose. Wrapping is a
   # matter of taste, and tables and long links routinely exceed any limit, so MD013 would
   # fire on every one of them.
