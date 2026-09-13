@@ -181,7 +181,8 @@ CLI_PIXI_DEPENDENCY = f'{CLI_DEPENDENCY} = ">=0.12"'
 #: nothing rechecks it. The text itself is the MIT licence every other lab repo carries.
 LICENSE_COPYRIGHT = r"(?m)^Copyright \(c\) \d{4} Liu Lab$"
 
-#: Committing needs an identity, and a fresh runner has none configured.
+#: Committing and tagging need a name and an email, and a fresh runner has neither.
+#: `Repo.fallback_identity` uses this only when git lacks one, since `-c` beats the user's own.
 GIT_IDENTITY = ("-c", "user.name=init-repo", "-c", "user.email=init-repo@localhost")
 
 
@@ -642,6 +643,15 @@ class Repo:
         return proc
 
     @property
+    def fallback_identity(self) -> tuple[str, ...]:
+        """`GIT_IDENTITY` when git has no name or no email here, and nothing when it has both."""
+        for key in ("user.name", "user.email"):
+            proc = self.git("config", "--get", key, check=False)
+            if proc.returncode != 0 or not proc.stdout.strip():
+                return GIT_IDENTITY
+        return ()
+
+    @property
     def tracked(self) -> list[str]:
         """Every tracked path, as git reports it."""
         return sorted(p for p in self.git("ls-files", "-z").stdout.split("\0") if p)
@@ -1092,7 +1102,7 @@ class Init:
             "Initialize this repo from the Liu Lab template\n\n"
             f"Renders the {self.identity.shape} shape as {self.identity.dist}."
         )
-        self.repo.git(*GIT_IDENTITY, "commit", "-q", "-m", message)
+        self.repo.git(*self.repo.fallback_identity, "commit", "-q", "-m", message)
         self.say("committed", self.repo.git("log", "-1", "--pretty=%h %s").stdout.strip())
 
     def tag(self, *, do_tag: bool) -> str | None:
@@ -1103,7 +1113,14 @@ class Init:
         if existing:
             self.say("skipped", f"v0.0.0 — this repo already has tags ({existing[-1]})")
             return None
-        self.repo.git(*GIT_IDENTITY, "tag", "-a", "v0.0.0", "-m", "The version before the first")
+        self.repo.git(
+            *self.repo.fallback_identity,
+            "tag",
+            "-a",
+            "v0.0.0",
+            "-m",
+            "The version before the first",
+        )
         self.say("tagged", "v0.0.0")
         return "v0.0.0"
 
