@@ -1,0 +1,669 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The starting point for a new Liu Lab repo: one toolchain, one gate, and a script that customises the copy.">
+      
+      
+      
+        <link rel="canonical" href="https://liuhlab.github.io/liulab-repo-template/research/github-template-mechanics-2026-08-30/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.57">
+    
+    
+      
+        <title>GitHub template mechanics - liulab-repo-template</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.5da3a30f.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#github-template-mechanics" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="liulab-repo-template" class="md-header__button md-logo" aria-label="liulab-repo-template" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            liulab-repo-template
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              GitHub template mechanics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/liuhlab/liulab-repo-template" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    liuhlab/liulab-repo-template
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="liulab-repo-template" class="md-nav__button md-logo" aria-label="liulab-repo-template" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    liulab-repo-template
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/liuhlab/liulab-repo-template" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    liuhlab/liulab-repo-template
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  The template
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-what-copies" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. What copies
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-what-does-not-copy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. What does not copy
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-git-history-and-hatch-vcs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Git history and hatch-vcs
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-branch-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Branch selection
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-gh-pages-and-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. gh-pages and Pages
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-what-init-repo-must-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        6. What init-repo must do
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="github-template-mechanics">GitHub template mechanics<a class="headerlink" href="#github-template-mechanics" title="Permanent link">&para;</a></h1>
+<p>Research for liuhlab/liulab-repo-template#4, 2026-08-30. What <code>gh repo create
+--template</code> gives a new repo, and what <code>init-repo</code> must build itself.</p>
+<p>GitHub's docs cover only file and branch copying. Everything else is inferred from that
+silence or checked against live repos; each claim says which.</p>
+<h2 id="1-what-copies">1. What copies<a class="headerlink" href="#1-what-copies" title="Permanent link">&para;</a></h2>
+<p>Template generation copies <strong>the git tree of the default branch</strong>, nothing more.
+"You can choose to include the directory structure and files from only the default
+branch of the template repository or to include all branches."
+(<a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template">creating-a-repository-from-a-template</a>)</p>
+<p>Because the unit is the git tree, anything git tracks copies:</p>
+<table>
+<thead>
+<tr>
+<th>Thing</th>
+<th>Copies?</th>
+<th>Basis</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.github/workflows/</code></td>
+<td>Yes</td>
+<td>Ordinary tracked files. Unlike forks, generated repos are independent, so scheduled workflows run.</td>
+</tr>
+<tr>
+<td>Dotfiles and dot-directories (<code>.claude/</code>, <code>.vale.ini</code>, <code>.pre-commit-config.yaml</code>)</td>
+<td>Yes</td>
+<td>Ordinary tracked files.</td>
+</tr>
+<tr>
+<td>Files with no extension (<code>LICENSE</code>, <code>justfile</code>)</td>
+<td>Yes</td>
+<td>Ordinary tracked files.</td>
+</tr>
+<tr>
+<td>Symlinks (<code>CLAUDE.md -&gt; AGENTS.md</code>)</td>
+<td>Expected yes — <strong>UNVERIFIED, needs empirical check</strong></td>
+<td>Git stores a symlink as a blob with mode <code>120000</code> (verified locally; also live in <code>liuhlab/bolero</code>, <code>liulab-genome</code>, <code>liulab-roadmap</code>, <code>liulab-compute-skills</code>, and <code>seqforge</code>'s <code>.agents/skills/*</code>). A tree copy preserves mode bits, but no GitHub doc says so.</td>
+</tr>
+<tr>
+<td>Empty directories</td>
+<td><strong>No</strong></td>
+<td>Git has no empty-tree entries — verified locally: <code>mkdir emptydir &amp;&amp; git add -A</code> records nothing.</td>
+</tr>
+<tr>
+<td>Git LFS files</td>
+<td><strong>No</strong></td>
+<td>"Your template repository cannot include files stored using Git LFS." (<a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-template-repository">creating-a-template-repository</a>)</td>
+</tr>
+</tbody>
+</table>
+<p>Empty-directory workaround: commit a placeholder (<code>.gitkeep</code>) inside it, or have
+<code>init-repo</code> <code>mkdir</code> it. A placeholder is preferable — it survives every clone.</p>
+<h2 id="2-what-does-not-copy">2. What does not copy<a class="headerlink" href="#2-what-does-not-copy" title="Permanent link">&para;</a></h2>
+<p>The docs never enumerate this. The generate endpoint's own description scopes it to
+content: "Creates a new repository using a repository template."
+(<a href="https://docs.github.com/en/rest/repos/repos#create-a-repository-using-a-template">REST: create a repository using a template</a>)
+Everything below is repository state stored outside the git tree, so none of it copies.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Carries over?</th>
+<th>Confidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Issues, pull requests, milestones, discussions</td>
+<td>No</td>
+<td>High — not tree content</td>
+</tr>
+<tr>
+<td>Labels</td>
+<td>No — see below</td>
+<td><strong>Verified</strong> by docs</td>
+</tr>
+<tr>
+<td>Actions secrets and variables</td>
+<td>No</td>
+<td>High; corroborated by <a href="https://github.com/orgs/community/discussions/144277">community #144277</a></td>
+</tr>
+<tr>
+<td>Branch protection / rulesets</td>
+<td>No</td>
+<td>High; corroborated by <a href="https://github.com/orgs/community/discussions/55200">community #55200</a></td>
+</tr>
+<tr>
+<td>Pages configuration</td>
+<td>No</td>
+<td>High — <strong>UNVERIFIED, needs empirical check</strong></td>
+</tr>
+<tr>
+<td>Wiki content, releases, tags</td>
+<td>No</td>
+<td>High (tags: see §3)</td>
+</tr>
+<tr>
+<td>Collaborators, webhooks</td>
+<td>No</td>
+<td>High</td>
+</tr>
+<tr>
+<td>Sub-issue / issue-dependency settings</td>
+<td>N/A</td>
+<td>Sub-issues need no per-repo enablement (<a href="https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/adding-sub-issues">adding sub-issues</a>); org-level issue types are inherited from <code>liuhlab</code>, not the template</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Labels, precisely.</strong> A generated repo is a <em>new</em> repo, and "Default labels are
+included in every new repository when the repository is created."
+(<a href="https://docs.github.com/en/issues/using-labels-and-milestones-to-track-work/managing-labels">managing-labels</a>)
+Verified against <code>liuhlab/liulab-data</code>, <code>bolerodata</code>, <code>MOODS_pixi</code>: each has exactly
+the nine stock labels (<code>bug</code>, <code>documentation</code>, <code>duplicate</code>, <code>enhancement</code>,
+<code>good first issue</code>, <code>help wanted</code>, <code>invalid</code>, <code>question</code>, <code>wontfix</code>). The docs list a
+tenth, <code>accessibility</code>; older repos lack it, so new repos may get ten.</p>
+<p><code>wontfix</code> already exists stock as <code>#ffffff</code> / "This will not be worked on". The lab's
+<code>wontfix</code> says "Will not be actioned", so it must be <em>overwritten</em>, not created.</p>
+<p>Simplest correct invocation — one command, clones the template's live label set:</p>
+<div class="highlight"><pre><span></span><code>gh<span class="w"> </span>label<span class="w"> </span>clone<span class="w"> </span>liuhlab/liulab-repo-template<span class="w"> </span>--force<span class="w"> </span>--repo<span class="w"> </span>liuhlab/&lt;name&gt;
+</code></pre></div>
+<p><code>--force</code> overwrites <code>wontfix</code>; without it that label is silently skipped
+(<code>gh label clone --help</code>, gh 2.95.0). Explicit equivalent, if the template is ever not
+the source of truth:</p>
+<div class="highlight"><pre><span></span><code>gh<span class="w"> </span>label<span class="w"> </span>create<span class="w"> </span>needs-triage<span class="w">       </span>-c<span class="w"> </span>d93f0b<span class="w"> </span>-d<span class="w"> </span><span class="s2">"Maintainer needs to evaluate this issue"</span>
+gh<span class="w"> </span>label<span class="w"> </span>create<span class="w"> </span>needs-info<span class="w">         </span>-c<span class="w"> </span>fbca04<span class="w"> </span>-d<span class="w"> </span><span class="s2">"Waiting on reporter for more information"</span>
+gh<span class="w"> </span>label<span class="w"> </span>create<span class="w"> </span>ready-for-agent<span class="w">    </span>-c<span class="w"> </span>0e8a16<span class="w"> </span>-d<span class="w"> </span><span class="s2">"Fully specified, ready for an AFK agent"</span>
+gh<span class="w"> </span>label<span class="w"> </span>create<span class="w"> </span>ready-for-human<span class="w">    </span>-c<span class="w"> </span>1d76db<span class="w"> </span>-d<span class="w"> </span><span class="s2">"Requires human implementation"</span>
+gh<span class="w"> </span>label<span class="w"> </span>create<span class="w"> </span>wontfix<span class="w">            </span>-c<span class="w"> </span>ffffff<span class="w"> </span>-d<span class="w"> </span><span class="s2">"Will not be actioned"</span><span class="w"> </span>--force
+gh<span class="w"> </span>label<span class="w"> </span>create<span class="w"> </span>wayfinder:map<span class="w">      </span>-c<span class="w"> </span>5319e7<span class="w"> </span>-d<span class="w"> </span><span class="s2">"The wayfinder map for an effort"</span>
+gh<span class="w"> </span>label<span class="w"> </span>create<span class="w"> </span>wayfinder:research<span class="w"> </span>-c<span class="w"> </span>006b75<span class="w"> </span>-d<span class="w"> </span><span class="s2">"AFK: resolved by a /research subagent"</span>
+gh<span class="w"> </span>label<span class="w"> </span>create<span class="w"> </span>wayfinder:grilling<span class="w"> </span>-c<span class="w"> </span>b60205<span class="w"> </span>-d<span class="w"> </span><span class="s2">"HITL: resolved by conversation"</span>
+gh<span class="w"> </span>label<span class="w"> </span>create<span class="w"> </span>wayfinder:prototype<span class="w"> </span>-c<span class="w"> </span>e99695<span class="w"> </span>-d<span class="w"> </span><span class="s2">"HITL: resolved by building a rough artifact"</span>
+gh<span class="w"> </span>label<span class="w"> </span>create<span class="w"> </span>wayfinder:task<span class="w">     </span>-c<span class="w"> </span>c5def5<span class="w"> </span>-d<span class="w"> </span><span class="s2">"Manual work that unblocks a decision"</span>
+</code></pre></div>
+<h2 id="3-git-history-and-hatch-vcs">3. Git history and hatch-vcs<a class="headerlink" href="#3-git-history-and-hatch-vcs" title="Permanent link">&para;</a></h2>
+<p>History is <strong>squashed</strong>: "a repository created from a template starts with a single
+commit." Branches from a template "have unrelated histories, which means you cannot
+create pull requests or merge between the branches."
+(<a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template">same page</a>)</p>
+<p>Tags therefore <strong>cannot</strong> carry — a tag names a commit, and the template's commits do
+not exist in the new repo. No doc states this outright; it follows from the single
+commit. <strong>UNVERIFIED, needs empirical check</strong>, but there is no mechanism for it.</p>
+<p>The hatch-vcs consequence is the sharp edge. <code>fallback-version</code> is "the version that
+will be used if no other method for detecting the version is successful"
+(<a href="https://github.com/ofek/hatch-vcs">hatch-vcs</a>) — and setuptools-scm uses it only
+"when using a tarball with no metadata"
+(<a href="https://setuptools-scm.readthedocs.io/en/latest/config/">config</a>). A cloned repo <em>is</em>
+an SCM checkout, so detection succeeds; it just has no tag. Verified locally on a
+one-commit, zero-tag repo:</p>
+<div class="highlight"><pre><span></span><code>NO-TAG VERSION: 0.1.dev1+g8361f6d77
+</code></pre></div>
+<p>So a fresh lab repo builds as <strong><code>0.1.dev1+g&lt;sha&gt;</code></strong>, not <code>0.0.0+dev</code>. That is a wrong,
+higher-than-intended version that will silently ship. <code>init-repo</code> must create and push
+a starting tag:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v0.0.0<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Initial version"</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v0.0.0
+</code></pre></div>
+<p>After that, the working tree reports <code>0.0.1.dev&lt;n&gt;+g&lt;sha&gt;</code> — next version is the tag
+with 1 added to its last component
+(<a href="https://setuptools-scm.readthedocs.io/en/latest/usage/">setuptools-scm usage</a>).</p>
+<h2 id="4-branch-selection">4. Branch selection<a class="headerlink" href="#4-branch-selection" title="Permanent link">&para;</a></h2>
+<p>No. The API takes no branch parameter — only <code>owner</code>, <code>name</code>, <code>description</code>,
+<code>private</code>, and <code>include_all_branches</code>: "Set to true to include the directory structure
+and files from all branches in the template repository, and not just the default
+branch" (default <code>false</code>).
+(<a href="https://docs.github.com/en/rest/repos/repos#create-a-repository-using-a-template">REST reference</a>)</p>
+<p><code>gh</code> exposes it as <code>--include-all-branches</code>, "Include all branches from template
+repository" (<a href="https://cli.github.com/manual/gh_repo_create">gh repo create</a>), guarded
+by <code>the --include-all-branches option is only supported when using --template</code>
+(<a href="https://github.com/cli/cli/blob/trunk/pkg/cmd/repo/create/create.go">cli/cli create.go</a>).
+It is all-or-default-only; you cannot target one non-default branch.</p>
+<p>Also from <code>create.go</code>: non-interactive runs need <code>--public</code>, <code>--private</code>, or
+<code>--internal</code>, and <code>--template</code> rejects <code>--add-readme</code>, <code>--team</code>, and <code>--source</code>.</p>
+<h2 id="5-gh-pages-and-pages">5. gh-pages and Pages<a class="headerlink" href="#5-gh-pages-and-pages" title="Permanent link">&para;</a></h2>
+<p>The <code>gh-pages</code> <strong>branch</strong> carries over only with <code>--include-all-branches</code>. The Pages
+<strong>setting</strong> does not — it is repo configuration, not tree content
+(<strong>UNVERIFIED, needs empirical check</strong>; <code>liulab-repo-template</code> has <code>has_pages: false</code>,
+so it cannot be confirmed from the template itself).</p>
+<p>Ordering constraint is documented: "Make sure the branch you want to use as your
+publishing source already exists in your repository."
+(<a href="https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site">configuring a publishing source</a>)
+So Pages must be enabled <em>after</em> <code>gh-pages</code> exists — either copied by
+<code>--include-all-branches</code> or pushed by the first docs build.</p>
+<div class="highlight"><pre><span></span><code>gh<span class="w"> </span>api<span class="w"> </span>--method<span class="w"> </span>POST<span class="w"> </span>repos/liuhlab/&lt;name&gt;/pages<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-f<span class="w"> </span><span class="s1">'build_type=legacy'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-f<span class="w"> </span><span class="s1">'source[branch]=gh-pages'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-f<span class="w"> </span><span class="s1">'source[path]=/'</span>
+</code></pre></div>
+<p><code>201</code> on success; <code>409</code> if Pages is already configured (use <code>PUT</code> to change it), <code>422</code>
+on validation failure — e.g. a missing branch
+(<a href="https://docs.github.com/en/rest/pages/pages">REST: Pages</a>). Requires admin or
+maintainer, and a token with <code>repo</code> scope. Treat <code>409</code> as success in <code>init-repo</code>.</p>
+<h2 id="6-what-init-repo-must-do">6. What init-repo must do<a class="headerlink" href="#6-what-init-repo-must-do" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Create with visibility and, if <code>gh-pages</code> is wanted up front,
+   <code>--include-all-branches</code>:
+   <code>gh repo create liuhlab/&lt;name&gt; --template liuhlab/liulab-repo-template --public --clone</code>.</li>
+<li>Rewrite identity: repo name, description, homepage, <code>README.md</code> title, package name
+   and paths in <code>pyproject.toml</code>, and any <code>liulab-repo-template</code> string left in the tree.</li>
+<li><code>gh label clone liuhlab/liulab-repo-template --force</code> — the ten lab labels; stock
+   defaults are already there and are left alone.</li>
+<li>Delete or keep stock labels deliberately (<code>bug</code>, <code>enhancement</code>, … are not lab roles).</li>
+<li>Create and push <code>v0.0.0</code> so hatch-vcs does not emit <code>0.1.dev1+g&lt;sha&gt;</code>.</li>
+<li>Recreate any empty directories the template needed (or ship <code>.gitkeep</code> files).</li>
+<li>Set repo settings the template cannot carry: issues on, wiki off, projects,
+   squash-merge policy, auto-delete branch on merge.</li>
+<li>Apply branch protection or a ruleset on <code>main</code>.</li>
+<li>Add Actions secrets and variables (none copy).</li>
+<li>Enable Pages from <code>gh-pages</code> — after the branch exists; tolerate <code>409</code>.</li>
+<li>Seed the wayfinder map issue and any bootstrap issues; none copy.</li>
+<li>Add collaborators or team access (<code>--template</code> forbids <code>--team</code> at create time).</li>
+<li>Verify symlinks survived (<code>git ls-files -s | grep 120000</code>) until that is confirmed.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":[],"search":"../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.49251538.min.js"></script>
+      
+    
+  </body>
+</html>

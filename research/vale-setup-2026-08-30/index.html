@@ -1,0 +1,751 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The starting point for a new Liu Lab repo: one toolchain, one gate, and a script that customises the copy.">
+      
+      
+      
+        <link rel="canonical" href="https://liuhlab.github.io/liulab-repo-template/research/vale-setup-2026-08-30/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.57">
+    
+    
+      
+        <title>Vale setup for the repo template - liulab-repo-template</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.5da3a30f.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#vale-setup-for-the-repo-template" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="liulab-repo-template" class="md-header__button md-logo" aria-label="liulab-repo-template" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            liulab-repo-template
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Vale setup for the repo template
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/liuhlab/liulab-repo-template" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    liuhlab/liulab-repo-template
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="liulab-repo-template" class="md-nav__button md-logo" aria-label="liulab-repo-template" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    liulab-repo-template
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/liuhlab/liulab-repo-template" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    liuhlab/liulab-repo-template
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  The template
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-packaging-commit-styles-in-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Packaging: commit <code>styles/</code> in-repo
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-three-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. The three rules
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-jargon-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. The jargon list
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The jargon list">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-distinction-that-matters-what-must-be-kept" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The distinction that matters: what must be KEPT
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-the-readability-number-cap-at-grade-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. The readability number: cap at grade 11
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-invocation-all-three" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Invocation: all three
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="vale-setup-for-the-repo-template">Vale setup for the repo template<a class="headerlink" href="#vale-setup-for-the-repo-template" title="Permanent link">&para;</a></h1>
+<p>Resolves liuhlab/liulab-repo-template#3. Every claim below was run against Vale 3.19.0
+(<code>pixi exec --spec vale==3.19.0</code>) over the six sibling repos. Numbers are Vale's, not estimates.</p>
+<h2 id="1-packaging-commit-styles-in-repo">1. Packaging: commit <code>styles/</code> in-repo<a class="headerlink" href="#1-packaging-commit-styles-in-repo" title="Permanent link">&para;</a></h2>
+<p><strong>Recommendation: commit the <code>Lab</code> style under <code>styles/Lab/</code>. Do not use <code>Packages</code>.</strong></p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>in-repo <code>styles/</code></th>
+<th><code>Packages</code> + <code>vale sync</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CI network</td>
+<td>none</td>
+<td>one fetch per run</td>
+</tr>
+<tr>
+<td>Failure mode</td>
+<td>none</td>
+<td>CI red when GitHub is slow</td>
+</tr>
+<tr>
+<td>Reviewability</td>
+<td>rule change shows in the PR diff</td>
+<td>invisible; lands out of band</td>
+</tr>
+<tr>
+<td>Cost</td>
+<td>one file to copy per repo</td>
+<td>a release process for 3 YAML files</td>
+</tr>
+</tbody>
+</table>
+<p><code>Packages</code> earns its keep when many repos share a large style that changes often. Three rules
+totalling ~40 lines is the opposite case. A template repo is <em>copied</em>, so the style travels with
+the copy for free. Revisit only if a fourth or fifth rule appears and repos start drifting.</p>
+<p>Note <code>StylesPath</code> is normally gitignored (it holds downloaded packages). Here it is tracked —
+so do <strong>not</strong> add <code>styles/</code> to <code>.gitignore</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># .vale.ini</span>
+<span class="na">StylesPath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">styles</span>
+<span class="na">MinAlertLevel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">error</span>
+
+<span class="c1"># Human-facing: plain language, readable prose.</span>
+<span class="k">[{README.md,docs/**/*.md}]</span>
+<span class="na">BasedOnStyles</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">Lab</span>
+<span class="na">Lab.Length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">NO</span>
+
+<span class="c1"># Agent-facing: word budget only. This section must come SECOND.</span>
+<span class="k">[{AGENTS.md,CONTEXT.md,docs/adr/*.md}]</span>
+<span class="na">BasedOnStyles</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">Lab</span>
+<span class="na">Lab.Jargon</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">NO</span>
+<span class="na">Lab.Readability</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">NO</span>
+<span class="na">Lab.Length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">YES</span>
+</code></pre></div>
+<p><strong>The <code>Lab.Length = YES</code> line is load-bearing.</strong> Vale's <code>*</code> matches <code>/</code>, so <code>docs/**/*.md</code>
+also matches <code>docs/adr/*.md</code>. Both sections match an ADR, and per-rule settings <em>accumulate</em>
+across matching sections — so without the explicit re-enable, ADRs inherit <code>Lab.Length = NO</code>
+from section one and are checked by <strong>nothing at all</strong>. Verified: with the line removed, ADRs
+produce zero alerts and CI passes green on an empty gate.</p>
+<h2 id="2-the-three-rules">2. The three rules<a class="headerlink" href="#2-the-three-rules" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="c1"># styles/Lab/Jargon.yml  — see the swap map in §3</span>
+<span class="nt">extends</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">substitution</span>
+<span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">"Jargon:</span><span class="nv"> </span><span class="s">prefer</span><span class="nv"> </span><span class="s">'%s'</span><span class="nv"> </span><span class="s">over</span><span class="nv"> </span><span class="s">'%s'."</span>
+<span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<span class="nt">ignorecase</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">swap</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="w"> </span><span class="nv">...</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># styles/Lab/Readability.yml</span>
+<span class="nt">extends</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">readability</span>
+<span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">"Reading</span><span class="nv"> </span><span class="s">grade</span><span class="nv"> </span><span class="s">(%s)</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">above</span><span class="nv"> </span><span class="s">11;</span><span class="nv"> </span><span class="s">shorten</span><span class="nv"> </span><span class="s">sentences,</span><span class="nv"> </span><span class="s">not</span><span class="nv"> </span><span class="s">domain</span><span class="nv"> </span><span class="s">terms."</span>
+<span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<span class="nt">grade</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">11</span>
+<span class="nt">metrics</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Flesch-Kincaid</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># styles/Lab/Length.yml</span>
+<span class="nt">extends</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">metric</span>
+<span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">"This</span><span class="nv"> </span><span class="s">file</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">%s</span><span class="nv"> </span><span class="s">words;</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">cap</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">400.</span><span class="nv"> </span><span class="s">Split</span><span class="nv"> </span><span class="s">it."</span>
+<span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error</span>
+<span class="nt">formula</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">words</span>
+<span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="s">"&gt;</span><span class="nv"> </span><span class="s">400.0"</span>
+</code></pre></div>
+<p>Confirmed against docs and by running it:</p>
+<ul>
+<li><code>metric</code> + <code>formula: words</code> + <code>condition</code> <strong>works per file</strong>. All <code>metric</code> rules are
+  <code>summary</code>-scoped because the variables are computed over the whole document; the alert is
+  reported at <code>1:1</code>. Observed output: <code>File is 88.00 words; the cap is 40.</code></li>
+<li>Conditions must be <strong>floating point</strong> — <code>"&gt; 400.0"</code>, not <code>"&gt; 400"</code>.</li>
+<li><code>.vale.ini</code> glob sections <strong>do</strong> scope different rules to different files, with the
+  accumulation caveat above. <code>BasedOnStyles</code> <em>replaces</em> across sections; named rules <em>accumulate</em>.</li>
+<li><code>readability</code> is the one extension point that takes no <code>scope</code>, and Vale skips fenced code
+  blocks by default — so code comments are not linted (this is why <code>idempotent</code> in
+  <code>liulab-data/README.md:34</code> and <code>hermetic</code> in <code>seqforge/README.md:50</code> never fire).</li>
+</ul>
+<h2 id="3-the-jargon-list">3. The jargon list<a class="headerlink" href="#3-the-jargon-list" title="Permanent link">&para;</a></h2>
+<p>I read the README and human-facing <code>docs/</code> of all six repos. <strong>The corpus is already clean of
+corporate jargon</strong>: zero hits for <em>leverage, utilize, facilitate, robust, seamless, ecosystem,
+paradigm, streamline, bespoke, in order to, first-class, turnkey, battle-tested</em>. A generic
+anti-corporate list would be pure dead weight here. The real offenders are architecture-speak
+and needlessly Latinate verbs. This map produces <strong>32 hits, zero false positives</strong>.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">swap</span><span class="p">:</span>
+<span class="w">  </span><span class="s">'(?:public|API|import|package)\s+surface'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">public API</span>
+<span class="w">  </span><span class="s">'surfac(?:e|es|ed)\s+(?:it\s+)?as'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">reported as</span>
+<span class="w">  </span><span class="s">'content[-</span><span class="nv"> </span><span class="s">]address(?:ed|ing)'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">named by its hash</span>
+<span class="w">  </span><span class="s">'shared</span><span class="nv"> </span><span class="s">(?:lab</span><span class="nv"> </span><span class="s">)?assets?'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shared lab images</span>
+<span class="w">  </span><span class="s">'guardrails</span><span class="nv"> </span><span class="s">baked</span><span class="nv"> </span><span class="s">in'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safety rules built in</span>
+<span class="w">  </span><span class="s">'degenerate</span><span class="nv"> </span><span class="s">case'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">simplest case</span>
+<span class="w">  </span><span class="s">'wire</span><span class="nv"> </span><span class="s">formats?'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file format</span>
+<span class="w">  </span><span class="s">'single</span><span class="nv"> </span><span class="s">source</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">truth'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">the one place it is defined</span>
+<span class="w">  </span><span class="s">'out</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">box'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">with no extra setup</span>
+<span class="w">  </span><span class="s">'helps</span><span class="nv"> </span><span class="s">to'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">helps</span>
+<span class="w">  </span><span class="s">'\bco-location\b'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">on the same machine</span>
+<span class="w">  </span><span class="s">'\bactionable\b'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">you can act on</span>
+<span class="w">  </span><span class="s">'\badditionally\b'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">also</span>
+<span class="w">  </span><span class="s">'\bexecutes?\b'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">run</span>
+<span class="w">  </span><span class="s">'\bperturbs?\b'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">change</span>
+<span class="w">  </span><span class="s">'\binterrogates?\b'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">asks</span>
+<span class="w">  </span><span class="s">'\barbitrates?\b'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">settle</span>
+<span class="w">  </span><span class="s">'\bmemoi[sz]e[sd]?\b'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cache</span>
+<span class="w">  </span><span class="s">'\bsubstrate\b'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">what it runs on</span>
+<span class="w">  </span><span class="s">'\bREPL\b'</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">interactive session</span>
+</code></pre></div>
+<p>Evidence (one per pattern, all verified):</p>
+<table>
+<thead>
+<tr>
+<th>Hit</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>liulab-genome/docs/reference.md:14</code> "one package's public surface"</td>
+<td>public API</td>
+</tr>
+<tr>
+<td><code>liulab-data/docs/tutorials/understanding-geo.md:41</code> "<code>labdata</code> surfaces it as a <code>BioSample</code> field"</td>
+<td>reports it as</td>
+</tr>
+<tr>
+<td><code>seqforge/README.md:22</code> "immutable, content-addressed"</td>
+<td>named by its own hash</td>
+</tr>
+<tr>
+<td><code>liulab-compute-skills/docs/index.md:21</code> "guardrails baked in"</td>
+<td>safety rules built in</td>
+</tr>
+<tr>
+<td><code>seqforge/docs/concepts/artifacts.md:95</code> "is the degenerate case: one assay"</td>
+<td>the simplest case</td>
+</tr>
+<tr>
+<td><code>eutely/docs/wormbase.md:61</code> "six sources in four wire formats"</td>
+<td>file formats (nothing goes over a wire)</td>
+</tr>
+<tr>
+<td><code>liulab-runtime/docs/containers.md:137</code> "finds <code>STAR</code> out of the box"</td>
+<td>with no extra setup</td>
+</tr>
+<tr>
+<td><code>liulab-runtime/docs/index.md:96</code> "execute a single command"</td>
+<td>run (the command is literally <code>pixi run</code>)</td>
+</tr>
+<tr>
+<td><code>seqforge/docs/concepts/refusal.md:28</code> "an actionable remedy"</td>
+<td>a remedy you can act on</td>
+</tr>
+<tr>
+<td><code>seqforge/docs/concepts/refusal.md:55</code> "interrogates you constantly"</td>
+<td>keeps asking you questions</td>
+</tr>
+<tr>
+<td><code>eutely/docs/wormbase.md:55</code> "both loaders memoise on the release"</td>
+<td>cache per release</td>
+</tr>
+<tr>
+<td><code>eutely/docs/deconv.md:11</code> "the substrate for the … comparison"</td>
+<td>what the comparison runs on</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-distinction-that-matters-what-must-be-kept">The distinction that matters: what must be KEPT<a class="headerlink" href="#the-distinction-that-matters-what-must-be-kept" title="Permanent link">&para;</a></h3>
+<p>The crux is that <strong>"surface" is both the worst offender and a term that must survive</strong>.
+<code>eutely/docs/anatomy.md</code> says "825 surfaces", "the evaluated surface" — that is Blender
+geometry, and a blanket <code>surface: API</code> swap would corrupt the page. Hence the patterns above
+match only the <em>verb</em> (<code>surfaces it as</code>) and the <em>compound noun</em> (<code>API surface</code>). Verified: zero
+hits in <code>anatomy.md</code>.</p>
+<p>Kept deliberately, with evidence they are real vocabulary and not padding:</p>
+<ul>
+<li><strong>Domain terms</strong> — FASTQ, BAM, GTF, FASTA, aligner, STAR, chromap, GEO/GSE/GSM/SRX, accession,
+  assembly, annotation, ortholog, motif, transcription factor, UMI, WormBase, anndata, syncytium.</li>
+<li><strong><code>manifest</code>, <code>artifact</code>, <code>probe</code>, <code>gate</code>, <code>rung</code></strong> — seqforge's own defined nouns, each
+  introduced with a definition. Renaming them would break the docs, not fix them.</li>
+<li><strong><code>canonical</code></strong> (6 hits, all liulab-genome) — means "the one official identifier form" in
+  cross-reference resolution. Genuine domain usage, not architecture-speak.</li>
+<li><strong><code>provenance</code></strong> (12+ hits) — used consistently for "where the bytes came from". Consistent
+  usage <em>is</em> vocabulary; there is no shorter exact word.</li>
+<li><strong><code>deterministic</code>, <code>immutable</code>, <code>preemptible</code></strong> — load-bearing precise claims. seqforge's whole
+  thesis is "deterministic code owns every decision"; softening it loses the point.</li>
+<li><strong><code>under the hood</code>, <code>baked in</code>, <code>load-bearing</code></strong> — plain-English idiom, shorter than any
+  replacement. Idiom is not jargon.</li>
+</ul>
+<p>Two gaps worth knowing: filler words (<code>simply</code>, 3 hits) are a <em>different</em> problem from jargon and
+do not belong in a substitution map — the message would read "prefer '' over 'simply'". And
+<code>seqforge/docs/kb/*.md</code> are one-line snippet includes; the prose they render lives in
+<code>src/seqforge/kb/specs/*/README.md</code>, outside <code>docs/</code>, so five published pages go unchecked.</p>
+<h2 id="4-the-readability-number-cap-at-grade-11">4. The readability number: cap at grade 11<a class="headerlink" href="#4-the-readability-number-cap-at-grade-11" title="Permanent link">&para;</a></h2>
+<p>Measured with Vale's own Flesch-Kincaid (<code>readability</code>, <code>grade: -99</code> to force the score out).</p>
+<table>
+<thead>
+<tr>
+<th>README</th>
+<th>FK grade</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>liulab-genome</td>
+<td>6.38</td>
+</tr>
+<tr>
+<td>liulab-runtime</td>
+<td>8.20</td>
+</tr>
+<tr>
+<td>liulab-data</td>
+<td>8.49</td>
+</tr>
+<tr>
+<td>eutely</td>
+<td>8.61</td>
+</tr>
+<tr>
+<td>liulab-compute-skills</td>
+<td>9.18</td>
+</tr>
+<tr>
+<td>seqforge</td>
+<td><strong>10.12</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Spread across all 56 human-facing docs: <strong>3.72 to 16.88</strong>, median 7.95.</p>
+<p><strong>Cap at 11.</strong> Every README passes today, with the tightest (seqforge, 10.12) keeping ~0.9 grades
+of headroom. It fails exactly three real pages — <code>seqforge/docs/kb/index.md</code> (11.60) and
+<code>eutely/docs/deconv.md</code> (11.49) — plus liulab-genome's seven <code>docs/context/*.md</code> glossaries
+(12.19–16.88). Those seven are agent-facing context files misfiled under <code>docs/</code>; <strong>move them to
+match the <code>CONTEXT.md</code> convention</strong> rather than loosening the cap for them. Grade 12 would be a
+gate that catches nothing; grade 10 would fail seqforge on day one.</p>
+<p>One honest tension: Flesch-Kincaid punishes polysyllabic words, which is exactly the domain
+vocabulary Rule 3 protects. "Transcription factor" cannot be shortened. Keep the cap loose and
+let <code>Lab.Jargon</code> do the word-choice work; use <code>Lab.Readability</code> to catch long <em>sentences</em>.</p>
+<h2 id="5-invocation-all-three">5. Invocation: all three<a class="headerlink" href="#5-invocation-all-three" title="Permanent link">&para;</a></h2>
+<p>One gate, three entry points. The rules live in <code>.vale.ini</code>, so every path enforces the same thing.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># pixi.toml</span>
+<span class="k">[dependencies]</span>
+<span class="n">vale</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"3.19.0.*"</span>
+
+<span class="k">[tasks]</span>
+<span class="n">vale</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"vale ."</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># .pre-commit-config.yaml</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local</span>
+<span class="w">  </span><span class="nt">hooks</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vale</span>
+<span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vale</span>
+<span class="w">      </span><span class="nt">entry</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pixi run -- vale</span>
+<span class="w">      </span><span class="nt">language</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">system</span>
+<span class="w">      </span><span class="nt">types</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">markdown</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">pass_filenames</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># .github/workflows/ci.yml</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix-dev/setup-pixi@v0.9.1</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">locked</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Vale</span>
+<span class="w">  </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pixi run vale</span>
+</code></pre></div>
+<p><code>language: system</code> means pre-commit will not install Vale; <code>entry: pixi run --</code> puts it on PATH
+from the pixi env, matching the lab's existing hook pattern.</p>
+<p><strong>Gotcha that silently disables the gate:</strong> Vale matches path globs against the filename <em>as
+passed</em>, relative to the working directory. Passing relative paths works
+(<code>vale docs/adr/0001-x.md</code> → alerts). Passing <strong>absolute</strong> paths matches no section at all and
+exits 0 with zero output. So the hook must run from the repo root and pass repo-relative names —
+which is pre-commit's default, but any wrapper script that resolves paths first will turn the
+gate into a no-op. Only <code>error</code>-level alerts set a non-zero exit code; all three rules are
+<code>level: error</code>, and <code>MinAlertLevel = error</code> keeps the output to what actually fails.</p>
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":[],"search":"../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.49251538.min.js"></script>
+      
+    
+  </body>
+</html>
