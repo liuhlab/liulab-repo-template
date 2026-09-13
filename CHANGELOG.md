@@ -107,3 +107,10 @@ sets one.
   when every rule passed. Both used to exit 1, so a bad checkout looked just like a repo that
   broke a rule. The two want opposite answers: one is a repo to fix, the other is a repo that
   nothing checked. `scripts/check.sh` already used 2 that way.
+
+### Fixed
+
+- `init-repo` now makes the first commit and the `v0.0.0` tag under the name and email your
+  git already has. It used to sign both as `init-repo <init-repo@localhost>` whatever git had,
+  so every new repo began with a commit linked to no GitHub account. That stand-in is now used
+  only when git has no name or no email, as on a fresh CI runner.
