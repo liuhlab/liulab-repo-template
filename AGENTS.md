@@ -119,7 +119,8 @@ example earns its keep. Say the surprising thing in one sentence and stop.
 | When | Read |
 | --- | --- |
 | Before changing code | `GLOSSARY.md`, then any ADR covering the area |
-| Recording vocabulary or a decision | `docs/agents/domain.md` |
-| Filing or working an issue | `docs/agents/issue-tracker.md` |
-| Labelling someone else's issue | `docs/agents/triage-labels.md` |
 | Writing anything | `docs/agents/writing.md` |
+
+The issue tracker, triage labels and domain docs are the lab defaults, the page `/lab-setup`
+points every agent at. A page of this repo's own under `docs/agents/` overrides only that one
+default, so write one only where this repo differs.

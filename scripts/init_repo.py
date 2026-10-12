@@ -117,7 +117,7 @@ TEMPLATE_ONLY = (
 #: BY EXACT PATH, never by directory or glob. A repo initialized late may already have written
 #: `docs/adr/0003-*.md` or a research note of its own, and deleting `docs/adr/` would take it
 #: with these. Both directories are allowed to disappear with their last file: `Repo.delete`
-#: prunes what it empties, and `docs/agents/domain.md` says `/domain-modeling` creates
+#: prunes what it empties, and the lab's domain-docs default says `/domain-modeling` creates
 #: `docs/adr/` when it needs one and that a missing one is not an error. No `.gitkeep` — a
 #: tracked file whose only job is to exist is exactly the residue this script removes.
 #:

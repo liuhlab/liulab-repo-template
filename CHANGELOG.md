@@ -122,6 +122,14 @@ sets one.
   broke a rule. The two want opposite answers: one is a repo to fix, the other is a repo that
   nothing checked. `scripts/check.sh` already used 2 that way.
 
+### Removed
+
+- The pages on the issue tracker, the triage labels and the domain docs are gone from
+  `docs/agents/`. A machine set up with `/lab-setup` gives every agent all three as lab
+  defaults, so a new repo needs none of them. Write your own page only where your repo is
+  different, and it replaces that one default and no other. The writing page stays, and so
+  does the step that copies the lab's labels to a new repo.
+
 ### Fixed
 
 - `init-repo` now makes the first commit and the `v0.0.0` tag under the name and email your

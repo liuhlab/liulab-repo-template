@@ -57,11 +57,11 @@
       "id": 3,
       "name": "declines-glossary-and-agents-md",
       "prompt": "Initializing this new repo — it's a methylation analysis library, module name `methyl`, no CLI, published to PyPI, for calling differentially methylated regions from bisulfite sequencing. While you're at it, seed GLOSSARY.md with our domain terms (CpG, bisulfite, DMR) and rewrite AGENTS.md properly, since the one in here is generic boilerplate. Tell me the plan before you do any of it.",
-      "expected_output": "Plans the four-question initialization through scripts/init_repo.py, and declines both extras: no glossary seeding at creation, because there is no code for a term to name, which is what docs/agents/domain.md forbids; and no AGENTS.md rewrite, because /init writes it later and the sentinel line is what says so.",
+      "expected_output": "Plans the four-question initialization through scripts/init_repo.py, and declines both extras: no glossary seeding at creation, because there is no code for a term to name, which the lab's domain-docs default from /lab-setup forbids; and no AGENTS.md rewrite, because /init writes it later and the sentinel line is what says so.",
       "files": ["a fresh single-commit template copy, remote liuhlab/liulab-methyl"],
       "assertions": [
         "Declines to seed GLOSSARY.md with glossary entries as part of initializing",
-        "Gives the reason that there is no code yet, so a seeded term names something that does not exist, and points at docs/agents/domain.md",
+        "Gives the reason that there is no code yet, so a seeded term names something that does not exist, and points at the lab's domain-docs default",
         "Declines to rewrite AGENTS.md now and leaves the sentinel line in place",
         "Says /init is what writes AGENTS.md for this repo, and that the sentinel is the thing that says so",
         "Still plans the initialization itself through scripts/init_repo.py with the shape, module, CLI and description answers"

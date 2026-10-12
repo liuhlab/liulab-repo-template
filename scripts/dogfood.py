@@ -329,6 +329,13 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
         "AGENTS.md": True,
         "GLOSSARY.md": True,
         "LICENSE": True,
+        # The tracker, labels and domain layout come from the lab defaults on the machine. A
+        # repo's own page replaces that one default for good, so a seeded copy would pin every
+        # new repo to the template's wording. Writing rules have no lab default.
+        "docs/agents/issue-tracker.md": False,
+        "docs/agents/triage-labels.md": False,
+        "docs/agents/domain.md": False,
+        "docs/agents/writing.md": True,
     }
     problems = [
         f"{rel} is {'missing' if wanted else 'still here'}"
