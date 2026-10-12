@@ -19,7 +19,7 @@ stays.
 | Writing rules | Vale checks them: word caps on the notes written for agents, plain language on the pages written for people. |
 | A docs site | This one. Built by zensical, published to GitHub Pages by a workflow. |
 | Skills for agents | Tracked links in `.claude/skills/` and `.agents/skills/` point at `skills/`, so an agent finds them the moment you clone. You install nothing. |
-| Notes for agents | `AGENTS.md`, `CONTEXT.md` and `docs/agents/` are written for a machine that has to act. They stay out of this menu and out of the search box. |
+| Notes for agents | `AGENTS.md`, `GLOSSARY.md` and `docs/agents/` are written for a machine that has to act. They stay out of this menu and out of the search box. |
 
 ## Making a repo from it
 

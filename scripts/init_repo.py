@@ -829,7 +829,7 @@ class Init:
             lambda text: drop_comment_block(text, "# These three carry the PLACEHOLDER"),
         )
         self.edit(
-            "CONTEXT.md",
+            "GLOSSARY.md",
             "the placeholder glossary entry",
             lambda text: drop_markdown_section(text, "### Placeholder package"),
         )
