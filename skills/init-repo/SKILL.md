@@ -52,9 +52,10 @@ and 3, and collecting an answer you are about to discard wastes the user's atten
 after fifty files carry it.
 
 **Ask nothing else.** No domain or glossary question: at creation there is no code, so a term
-seeded now names something that does not exist, which is what `docs/agents/domain.md` says
-not to write. If the user asks you to fill in `GLOSSARY.md` anyway, decline and give that
-reason — the answer is "once the code exists", not a vaguer entry today.
+seeded now names something that does not exist. The lab's domain-docs default, from
+`/lab-setup`, says the glossary is written when a term is resolved, never upfront. If the user
+asks you to fill in `GLOSSARY.md` anyway, decline and give that reason — the answer is "once
+the code exists", not a vaguer entry today.
 
 ## Plan first, then ask about what changed
 
