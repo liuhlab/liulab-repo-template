@@ -90,6 +90,18 @@ INIT_SKILL = "skills/init-repo"
 #: Rule 1's name, needed by name because it is the one rule that refuses to be waived.
 UNWAIVABLE = "placeholder-rename"
 
+#: The glossary, by the name the upstream skills read and write, and the name each file had
+#: before upstream renamed it. A repo still on the old name is failed rather than passed over:
+#: "no GLOSSARY.md" would be the quiet answer to a rename that never happened.
+GLOSSARY = "GLOSSARY.md"
+GLOSSARY_MAP = "GLOSSARY-MAP.md"
+GLOSSARY_RENAMES = (("CONTEXT.md", GLOSSARY), ("CONTEXT-MAP.md", GLOSSARY_MAP))
+
+#: An upstream-format glossary entry: a line that is a bold term and a colon and nothing else,
+#: the definition on the lines below. Whole-line on purpose. A lab entry may open a paragraph on
+#: a bold phrase and a colon and run on, and that is prose.
+_UPSTREAM_ENTRY_RE = re.compile(r"^\*\*(?P<term>[^*]+)\*\*:\s*$")
+
 #: The site configuration every repo that publishes a site has, and where the site source sits
 #: when it does not say. Rules 2 and 13 are both scoped to the pages the site publishes, so they
 #: read the declared source rather than assuming it.
@@ -192,6 +204,12 @@ _SKILL_DIR_RES = (
     re.compile(r"^skills/(?P<name>[^/]+)/"),
     re.compile(r"^\.(?:claude|agents)/skills/(?P<name>[^/]+)(?:/|$)"),
 )
+
+#: The prefix the lab's shared plugin owns, and where it ships every other name: Claude Code's
+#: clone of the `liulab` marketplace, relative to the home directory. Kimi Code reads its skills
+#: from that clone too. Read from the machine, so CI, with no plugin installed, cannot check it.
+LAB_PREFIX = "lab-"
+PLUGIN_SKILLS = ".claude/plugins/marketplaces/liulab/skills"
 
 
 @dataclass(frozen=True)
@@ -846,7 +864,7 @@ def _vale_sections(text: str) -> list[tuple[str, dict[str, str]]]:
 
 
 def _glossary_entries(text: str) -> list[tuple[str, int]]:
-    """Each `###` entry under `## Glossary` in `CONTEXT.md`, with its word count.
+    """Each `###` entry under `## Glossary` in the glossary, with its word count.
 
     The cap is per ENTRY and not per file, so a repo with a large vocabulary is not punished for
     the size of its domain. An entry runs from its own heading to the next heading at the same or
@@ -1002,7 +1020,7 @@ def rule_agent_docs_unpublished(repo: Repo) -> Result:
     """2. Agent-facing pages the site would publish stay out of the navbar and out of search."""
     result = Result()
     prefix = f"{repo.docs_dir}/"
-    # Scoped to the agent-docs keys UNDER THE SITE SOURCE. `AGENTS.md`, `CONTEXT.md` and
+    # Scoped to the agent-docs keys UNDER THE SITE SOURCE. `AGENTS.md`, `GLOSSARY.md` and
     # `skills/` are agent-facing too, but the site never publishes them: front matter there means
     # nothing, and on a SKILL.md it lands in the frontmatter a skill loader reads.
     keys = sorted(k for k in repo.agent_docs if k.startswith(prefix))
@@ -1098,23 +1116,54 @@ def rule_vale_length_sections(repo: Repo) -> Result:
     return result
 
 
-def rule_glossary_entry_length(repo: Repo) -> Result:
-    """4. No glossary entry in `CONTEXT.md` runs past 200 words."""
+def rule_glossary_format(repo: Repo) -> Result:
+    """4. The glossary is `GLOSSARY.md`, and no entry in it runs past 200 words."""
     cap = 200
     result = Result()
-    text = repo.read("CONTEXT.md")
-    if text is None:
-        result.notes.append("not checked: no CONTEXT.md")
+    if repo.exists(GLOSSARY_MAP):
+        result.notes.append(
+            f"not checked: {GLOSSARY_MAP} is here, so the glossary is split by context into "
+            "files this rule does not read"
+        )
         return result
+    for before, after in GLOSSARY_RENAMES:
+        if repo.exists(before) and not repo.exists(after):
+            result.problems.append(
+                _problem(
+                    f"{before} is still here, and {after} is not",
+                    f"the upstream skills read and write {after} and nothing else, so they find "
+                    "no glossary here and start a second one beside this",
+                    f"`git mv {before} {after}`, with the entries unchanged",
+                )
+            )
+    text = repo.read(GLOSSARY)
+    if text is None:
+        if not result.problems:
+            result.notes.append(f"not checked: no {GLOSSARY}")
+        return result
+    for number, line in enumerate(text.splitlines(), start=1):
+        upstream = _UPSTREAM_ENTRY_RE.match(line)
+        if upstream:
+            result.problems.append(
+                _problem(
+                    f"{GLOSSARY} line {number} is an upstream-format entry, `{line.strip()}`",
+                    "a lab glossary entry is a `###` heading under `## Glossary`, and only that "
+                    "shape is capped. A term line is one this rule cannot measure, so a glossary "
+                    "written this way would pass with every entry unchecked",
+                    f"make it `### {upstream['term'].strip()}` under `## Glossary`, with the "
+                    "definition below it",
+                )
+            )
     entries = _glossary_entries(text)
     if not entries:
-        result.notes.append("not checked: CONTEXT.md has no entries under `## Glossary`")
+        if not result.problems:
+            result.notes.append(f"not checked: {GLOSSARY} has no entries under `## Glossary`")
         return result
     for title, words in entries:
         if words > cap:
             result.problems.append(
                 _problem(
-                    f"CONTEXT.md glossary entry `{title}` is {words} words, over {cap}",
+                    f"{GLOSSARY} glossary entry `{title}` is {words} words, over {cap}",
                     "the glossary says what a word MEANS in this repo. An entry that long is an "
                     "explanation, and it belongs in a document the glossary can point at",
                     "cut it to a definition and move the rest to docs/, or to an ADR if it is a "
@@ -1145,8 +1194,21 @@ def rule_skill_file_location(repo: Repo) -> Result:
     return result
 
 
-def rule_skill_name_prefix(repo: Repo) -> Result:
-    """6. No repo-local skill directory begins with `lab-`."""
+def _shipped_skills(home: Path) -> frozenset[str] | None:
+    """Every skill name the installed `lab` plugin ships, casefolded, or ``None`` if none is found.
+
+    Read from the marketplace clone, where each directory holding a `SKILL.md` is one skill. An
+    empty or absent directory is ``None`` and never an empty set: an empty set would let every
+    name through, which is the pass this rule must not give when it knows nothing.
+    """
+    found = frozenset(
+        skill.parent.name.casefold() for skill in (home / PLUGIN_SKILLS).glob("*/SKILL.md")
+    )
+    return found or None
+
+
+def rule_skill_name_clash(repo: Repo) -> Result:
+    """6. No repo-local skill takes a name the `lab` plugin ships."""
     result = Result()
     names: dict[str, str] = {}
     for rel in repo.tracked:
@@ -1155,19 +1217,33 @@ def rule_skill_name_prefix(repo: Repo) -> Result:
             if match:
                 names.setdefault(match["name"], rel)
                 break
+    try:
+        shipped = _shipped_skills(Path.home())
+    except RuntimeError:  # no HOME and no password entry: nowhere to look
+        shipped = None
     for name, rel in sorted(names.items()):
-        if name.startswith("lab-"):
+        if name.casefold().startswith(LAB_PREFIX) or name.casefold() in (shipped or ()):
             result.problems.append(
                 _problem(
                     f"{rel} is a repo-local skill named `{name}`",
-                    "the lab's shared plugin owns the `lab-` prefix, and a repo-local skill of "
-                    "the same name shadows it for everyone working in this repo — silently, "
-                    "since both are discovered the same way",
-                    "rename it to something without the `lab-` prefix, then run "
+                    f"the `lab` plugin ships this name or owns it, as it owns every `{LAB_PREFIX}` "
+                    "name. A repo-local skill of the same name replaces the plugin's for "
+                    "everyone working here — silently, and in Kimi Code even when only the case "
+                    "differs",
+                    "rename it to a name the plugin does not ship, then run "
                     "`python skills/install.py --target all`",
                 )
             )
-    result.notes.append(f"{len(names)} skill director(ies) named across the discovery paths")
+    if shipped is None:
+        result.notes.append(
+            f"not checked: no `lab` plugin skills under ~/{PLUGIN_SKILLS}, so the "
+            f"{len(names)} skill name(s) here were held to the `{LAB_PREFIX}` prefix alone"
+        )
+    else:
+        result.notes.append(
+            f"{len(names)} skill director(ies) named across the discovery paths, against the "
+            f"{len(shipped)} name(s) the `lab` plugin ships"
+        )
     return result
 
 
@@ -1738,9 +1814,11 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         4,
-        "glossary-entry-length",
-        "no glossary entry in CONTEXT.md exceeds 200 words",
-        rule_glossary_entry_length,
+        "glossary-format",
+        f"the glossary is {GLOSSARY}, never a CONTEXT.md left unrenamed; each entry is a `###` "
+        "heading under `## Glossary`, never an upstream `**Term**:` line, and none exceeds 200 "
+        f"words. Where a {GLOSSARY_MAP} splits it by context, it is reported unchecked",
+        rule_glossary_format,
     ),
     Rule(
         5,
@@ -1750,9 +1828,11 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         6,
-        "skill-name-prefix",
-        "no repo-local skill directory begins with `lab-`, which the shared plugin owns",
-        rule_skill_name_prefix,
+        "skill-name-clash",
+        f"no repo-local skill takes a name the `lab` plugin ships: no `{LAB_PREFIX}` name, and no "
+        f"name in the plugin's marketplace clone under ~/{PLUGIN_SKILLS}. Where no clone is "
+        "found the prefix alone is held, and the rule says it did not check the rest",
+        rule_skill_name_clash,
     ),
     Rule(
         7,

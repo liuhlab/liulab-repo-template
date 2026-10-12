@@ -58,7 +58,7 @@ test = "pytest"
 
 [tool.liulab.agent-docs]
 "AGENTS.md" = "LengthDoc"
-"CONTEXT.md" = "LengthDoc"
+"GLOSSARY.md" = "LengthDoc"
 "docs/agents/" = "LengthDoc"
 "skills/" = "LengthDoc"
 "docs/adr/" = "LengthAdr"
@@ -78,7 +78,7 @@ BasedOnStyles = Lab
 Lab.LengthDoc = NO
 Lab.LengthAdr = NO
 
-[{AGENTS.md,CONTEXT.md,docs/agents/**/*.md,skills/**/SKILL.md}]
+[{AGENTS.md,GLOSSARY.md,docs/agents/**/*.md,skills/**/SKILL.md}]
 BasedOnStyles = Lab
 Lab.LengthDoc = YES
 Lab.LengthAdr = NO
@@ -108,6 +108,11 @@ nav:
 # borrowed the path would agree with rule 9 by construction and prove nothing about the
 # convention. Rule 8 wants a CHANGELOG.md wherever this file is, so `publishes` writes both.
 RELEASE_YML = ".github/workflows/release.yml"
+
+# Where rule 6 finds the names the `lab` plugin ships: Claude Code's clone of the marketplace,
+# under the home directory. Spelled out for the reason the release path is. Every run here gets
+# a home of its own beside the tree, so no test reads the real one.
+PLUGIN_SKILLS = ".claude/plugins/marketplaces/liulab/skills"
 
 _STATUS_RE = re.compile(
     r"^\s+(?:rule|warn) \d+\s+(?P<name>\S+)\s+(?P<status>ok|FAIL|--|warn|waived)(\s|$)"
@@ -163,6 +168,17 @@ def runs(root: Path, *commands: str, job: str = "check") -> None:
     )
 
 
+def home_of(root: Path) -> Path:
+    """The home directory a run over this tree sees, beside the tree and never the real one."""
+    return root.parent / "home"
+
+
+def plugin_ships(root: Path, *names: str) -> None:
+    """Install a `lab` plugin shipping these skills, in the home a run over this tree sees."""
+    for name in names:
+        write(home_of(root), f"{PLUGIN_SKILLS}/{name}/SKILL.md", f"---\nname: {name}\n---\n")
+
+
 def add_skill(root: Path, name: str) -> None:
     """A skill and both committed discovery symlinks, relative, as `install.py` writes them."""
     write(root, f"skills/{name}/SKILL.md", f"---\nname: {name}\n---\n\n# {name}\n")
@@ -179,14 +195,18 @@ def repo(tmp_path: Path) -> Path:
     It has no `src/`, no workflow at all and so no release workflow, so rule 8's two conditionals,
     rule 9 and rule 11 are all vacuous here; the tests that care add the premise, through
     `publishes` and `runs`. It has no `skills/init-repo/`, so rule 1 and warning 14 are both live
-    — the state a derived repo is in, and the only state where they check anything.
+    — the state a derived repo is in, and the only state where they check anything. Its home
+    has the `lab` plugin installed, so rule 6 is live too, as on a lab member's machine.
     """
     root = tmp_path / "repo"
+    plugin_ships(root, "lab-hpc", "tdd", "grilling")
     write(root, "pyproject.toml", PYPROJECT)
     write(root, ".vale.ini", VALE_INI)
     write(root, "mkdocs.yml", MKDOCS)
     write(root, "AGENTS.md", "# example\n\nWhat this repo is and how to work in it.\n")
-    write(root, "CONTEXT.md", "# Context\n\n## Glossary\n\n### Term\n\nWhat the word means here.\n")
+    write(
+        root, "GLOSSARY.md", "# Glossary\n\n## Glossary\n\n### Term\n\nWhat the word means here.\n"
+    )
     write(root, "docs/index.md", "# example\n\nThe front page.\n")
     write(root, "docs/api.md", "# API\n\nThe reference.\n")
     write(root, "docs/agents/writing.md", f"{FRONT_MATTER}# Writing rules\n\nBe concise.\n")
@@ -212,6 +232,9 @@ def conformance(
     history, and a commit would need an identity this environment may not have. `stage=False` is
     for the one tree that is not a repo at all, where there is nothing to stage into.
 
+    HOME is a directory beside the tree, never the real one: rule 6 reads the plugin installed
+    there, and a test must not pass or fail on what this machine has installed.
+
     `ceiling` is what makes such a tree genuinely repo-less. `git ls-files` walks UP from its
     working directory, so a scratch directory inherits whatever repository happens to be above it —
     and a test that relied on the temporary directory sitting outside one would pass or fail on
@@ -219,7 +242,7 @@ def conformance(
     """
     if stage:
         subprocess.run(["git", "add", "-A"], cwd=root, check=True)
-    env = dict(os.environ)
+    env = dict(os.environ, HOME=str(home_of(root)))
     if ceiling is not None:
         env["GIT_CEILING_DIRECTORIES"] = str(ceiling)
     return subprocess.run(
@@ -259,9 +282,9 @@ def test_the_fixture_tree_passes_every_rule(repo: Path) -> None:
         "placeholder-rename",
         "agent-docs-unpublished",
         "vale-length-sections",
-        "glossary-entry-length",
+        "glossary-format",
         "skill-file-location",
-        "skill-name-prefix",
+        "skill-name-clash",
         "skill-symlinks",
         "repo-shape",
         "release-trigger",
@@ -275,6 +298,7 @@ def test_the_fixture_tree_passes_every_rule(repo: Path) -> None:
     assert verdicts["placeholder-rename"] == "ok"  # live, not gated off
     assert verdicts["agent-docs-unpublished"] == "ok"
     assert verdicts["vale-length-sections"] == "ok"
+    assert verdicts["glossary-format"] == "ok"  # GLOSSARY.md is read, not skipped
 
 
 def test_a_tree_that_has_skills_passes_every_rule(repo: Path) -> None:
@@ -285,7 +309,7 @@ def test_a_tree_that_has_skills_passes_every_rule(repo: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
     verdicts = statuses(proc)
     assert verdicts["skill-file-location"] == "ok"
-    assert verdicts["skill-name-prefix"] == "ok"
+    assert verdicts["skill-name-clash"] == "ok"
     assert verdicts["skill-symlinks"] == SYMLINKS_STATUS
     assert SYMLINKS_NOTE in flat(proc.stdout)
 
@@ -452,11 +476,11 @@ def test_rule_3_does_not_require_a_key_for_every_header_token(repo: Path) -> Non
 
 def test_rule_4_fires_on_an_overlong_glossary_entry(repo: Path) -> None:
     body = " ".join(["word"] * 250)
-    write(repo, "CONTEXT.md", f"# Context\n\n## Glossary\n\n### Long term\n\n{body}\n")
+    write(repo, "GLOSSARY.md", f"# Glossary\n\n## Glossary\n\n### Long term\n\n{body}\n")
     proc = conformance(repo)
     assert proc.returncode == 1
-    assert statuses(proc)["glossary-entry-length"] == "FAIL"
-    assert "CONTEXT.md glossary entry `Long term` is 252 words, over 200" in proc.stderr
+    assert statuses(proc)["glossary-format"] == "FAIL"
+    assert "GLOSSARY.md glossary entry `Long term` is 252 words, over 200" in proc.stderr
 
 
 def test_rule_4_caps_each_entry_and_not_the_file(repo: Path) -> None:
@@ -464,10 +488,70 @@ def test_rule_4_caps_each_entry_and_not_the_file(repo: Path) -> None:
     # entry so a large vocabulary is not punished for the size of its domain.
     body = " ".join(["word"] * 150)
     entries = "".join(f"### Term {n}\n\n{body}\n\n" for n in range(4))
-    write(repo, "CONTEXT.md", f"# Context\n\n## Glossary\n\n{entries}")
+    write(repo, "GLOSSARY.md", f"# Glossary\n\n## Glossary\n\n{entries}")
     proc = conformance(repo)
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert statuses(proc)["glossary-entry-length"] == "ok"
+    assert statuses(proc)["glossary-format"] == "ok"
+
+
+def test_rule_4_fires_on_a_glossary_still_named_context_md(repo: Path) -> None:
+    # The upstream skills look for GLOSSARY.md alone. A repo that missed the rename has a
+    # glossary nothing reads, and "no GLOSSARY.md, not checked" would be the quiet answer.
+    (repo / "GLOSSARY.md").rename(repo / "CONTEXT.md")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["glossary-format"] == "FAIL"
+    assert "CONTEXT.md is still here, and GLOSSARY.md is not" in proc.stderr
+    assert "git mv CONTEXT.md GLOSSARY.md" in proc.stderr
+
+
+def test_rule_4_fires_on_an_upstream_format_entry(repo: Path) -> None:
+    # The shape the upstream glossary skill writes: a `## Language` section of `**Term**:` lines.
+    # It has no `## Glossary` heading, so the entry cap alone would call this file empty.
+    write(
+        repo,
+        "GLOSSARY.md",
+        "# Ordering\n\n## Language\n\n**Order**:\nA customer's request.\n_Avoid_: Purchase\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["glossary-format"] == "FAIL"
+    assert "GLOSSARY.md line 5 is an upstream-format entry, `**Order**:`" in proc.stderr
+
+
+def test_rule_4_leaves_a_bold_lead_in_inside_an_entry_alone(repo: Path) -> None:
+    # Measured in a lab glossary: a `###` entry whose paragraph opens on a bold phrase and a
+    # colon, with the sentence running on. That is prose, not a term line.
+    write(
+        repo,
+        "GLOSSARY.md",
+        "# Glossary\n\n## Glossary\n\n### Chain\n\n"
+        "**It is built from plain Python**: a mapping of kind and sequence.\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["glossary-format"] == "ok"
+
+
+def test_rule_4_is_not_checked_where_a_glossary_map_exists(repo: Path) -> None:
+    # A map splits the glossary per context, in files this rule does not read. The root file
+    # here would fail, which is what proves the rule stood down rather than passed.
+    write(repo, "GLOSSARY-MAP.md", "# Glossary Map\n\n## Contexts\n\n- [Ordering](./src/o.md)\n")
+    write(repo, "GLOSSARY.md", "# Ordering\n\n## Language\n\n**Order**:\nA request.\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["glossary-format"] == "--"
+    assert "not checked: GLOSSARY-MAP.md is here" in flat(proc.stdout)
+
+
+def test_rule_4_fires_on_a_glossary_map_still_named_context_map_md(repo: Path) -> None:
+    # Upstream renamed both files in one change, and its skills now look for neither old name.
+    (repo / "GLOSSARY.md").unlink()
+    write(repo, "CONTEXT-MAP.md", "# Context Map\n\n## Contexts\n\n- [Ordering](./src/o.md)\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["glossary-format"] == "FAIL"
+    assert "git mv CONTEXT-MAP.md GLOSSARY-MAP.md" in proc.stderr
 
 
 def test_rule_5_fires_on_a_skill_file_the_installer_cannot_see(repo: Path) -> None:
@@ -485,8 +569,48 @@ def test_rule_6_fires_on_a_skill_that_shadows_the_shared_plugin(repo: Path) -> N
     proc = conformance(repo)
     assert proc.returncode == 1
     verdicts = statuses(proc)
-    assert verdicts["skill-name-prefix"] == "FAIL"
+    assert verdicts["skill-name-clash"] == "FAIL"
     assert verdicts["skill-symlinks"] == SYMLINKS_STATUS
+    assert "is a repo-local skill named `lab-hpc`" in proc.stderr
+
+
+def test_rule_6_fires_on_a_bare_name_the_plugin_ships(repo: Path) -> None:
+    # The plugin ships upstream skills under their own names, with no `lab-` on them. In Kimi
+    # Code a repo skill of the same name replaces the plugin's, and nothing says so.
+    add_skill(repo, "tdd")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["skill-name-clash"] == "FAIL"
+    assert "is a repo-local skill named `tdd`" in proc.stderr
+
+
+def test_rule_6_compares_names_the_way_kimi_code_does(repo: Path) -> None:
+    # Kimi Code matches skill names case-insensitively, so this one still replaces `tdd`.
+    add_skill(repo, "TDD")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["skill-name-clash"] == "FAIL"
+    assert "repo-local skill named `TDD`" in proc.stderr
+
+
+def test_rule_6_is_not_checked_where_no_plugin_is_installed(repo: Path) -> None:
+    # CI, or a machine without the plugin: the names are unknown, so a skill that takes one
+    # must not read as a pass. `--` with the reason, and the exit status of a vacuous rule.
+    shutil.rmtree(home_of(repo))
+    add_skill(repo, "tdd")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["skill-name-clash"] == "--"
+    assert f"not checked: no `lab` plugin skills under ~/{PLUGIN_SKILLS}" in flat(proc.stdout)
+
+
+def test_rule_6_still_holds_the_lab_prefix_where_no_plugin_is_installed(repo: Path) -> None:
+    # The plugin owns every `lab-` name, shipped yet or not, and that needs no installed copy.
+    shutil.rmtree(home_of(repo))
+    add_skill(repo, "lab-hpc")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["skill-name-clash"] == "FAIL"
     assert "is a repo-local skill named `lab-hpc`" in proc.stderr
 
 
@@ -695,15 +819,15 @@ def test_warning_14_is_silent_while_the_init_skill_is_the_nag(repo: Path) -> Non
 
 def test_a_waiver_suppresses_its_rule_and_is_still_printed(repo: Path) -> None:
     body = " ".join(["word"] * 250)
-    write(repo, "CONTEXT.md", f"# Context\n\n## Glossary\n\n### Long term\n\n{body}\n")
+    write(repo, "GLOSSARY.md", f"# Glossary\n\n## Glossary\n\n### Long term\n\n{body}\n")
     reason = "the domain needs one long entry, tracked in issue 41"
-    write(repo, "pyproject.toml", PYPROJECT + f'glossary-entry-length = "{reason}"\n')
+    write(repo, "pyproject.toml", PYPROJECT + f'glossary-format = "{reason}"\n')
     proc = conformance(repo)
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert statuses(proc)["glossary-entry-length"] == "waived"
+    assert statuses(proc)["glossary-format"] == "waived"
     assert f"1 problem(s) suppressed: {reason}" in flat(proc.stdout)
     # and warning 15 prints it a second time, in the waiver table
-    assert f"glossary-entry-length: 1 problem(s) suppressed — {reason}" in flat(proc.stdout)
+    assert f"glossary-format: 1 problem(s) suppressed — {reason}" in flat(proc.stdout)
 
 
 def test_every_waiver_is_printed_on_a_green_run_too(repo: Path) -> None:

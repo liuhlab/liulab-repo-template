@@ -61,7 +61,7 @@ pixi run docs-build
 | `tests/` | the tests |
 | `docs/` | this site |
 | `scripts/check.sh` | the gate every commit has to pass |
-| `CONTEXT.md` | the glossary: the words this repo uses |
+| `GLOSSARY.md` | the glossary: the words this repo uses |
 
 Some notes are written for coding agents, not for people. Conventions go under
 `docs/agents/`, decision records under `docs/adr/`, and research notes under

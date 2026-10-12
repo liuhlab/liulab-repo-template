@@ -327,7 +327,7 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
         # repo's rather than the template's.
         "CHANGELOG.md": True,
         "AGENTS.md": True,
-        "CONTEXT.md": True,
+        "GLOSSARY.md": True,
         "LICENSE": True,
     }
     problems = [

@@ -21,10 +21,10 @@ says what belongs in one and where each fact lives when it does not.
 | --- | --- |
 | `AGENTS.md`, `docs/agents/*`, `skills/*/SKILL.md` | 1000 (`Lab.LengthDoc`) |
 | `docs/adr/*` | 400 (`Lab.LengthAdr`) |
-| `CONTEXT.md` | 200 words per glossary entry, checked by `conformance` |
+| `GLOSSARY.md` | 200 words per glossary entry, checked by `conformance` |
 | `docs/research/*` | none — research notes are long by nature |
 
-`CONTEXT.md` has no file cap. A glossary grows one term at a time and never shrinks, so a
+`GLOSSARY.md` has no file cap. A glossary grows one term at a time and never shrinks, so a
 file-level count measures how big the domain is, not how well the entries are written — a cap
 set for fourteen terms fires again at sixteen. The per-entry cap is the unit that matches, and
 it is the only one. What can go wrong with a long glossary is the number of entries, which no

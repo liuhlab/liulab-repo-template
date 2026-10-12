@@ -41,7 +41,7 @@ tests/            pytest, mirroring src/
 docs/             the published site; docs/adr/ and docs/agents/ are agent-facing
 skills/           repo-local agent skills; `python skills/install.py --help`
 scripts/check.sh  the gate runner
-CONTEXT.md        the glossary — the words this repo uses
+GLOSSARY.md       the glossary — the words this repo uses
 ```
 
 ## Gates
@@ -107,7 +107,7 @@ place that holds none of them accountable, which is why it is the wrong place:
 | --- | --- |
 | What the code does | a test pins it |
 | A decision and its trade-off | an ADR |
-| Vocabulary | `CONTEXT.md` |
+| Vocabulary | `GLOSSARY.md` |
 | What is still open | an issue |
 | A measurement | nowhere — delete it |
 
@@ -118,7 +118,7 @@ example earns its keep. Say the surprising thing in one sentence and stop.
 
 | When | Read |
 | --- | --- |
-| Before changing code | `CONTEXT.md`, then any ADR covering the area |
+| Before changing code | `GLOSSARY.md`, then any ADR covering the area |
 | Recording vocabulary or a decision | `docs/agents/domain.md` |
 | Filing or working an issue | `docs/agents/issue-tracker.md` |
 | Labelling someone else's issue | `docs/agents/triage-labels.md` |

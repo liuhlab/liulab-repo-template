@@ -66,6 +66,20 @@ sets one.
 
 ### Changed
 
+- The glossary is now `GLOSSARY.md`, the name the upstream skills read and write, and its
+  conformance rule checks more. A repo whose glossary is still `CONTEXT.md`, or whose map is
+  still `CONTEXT-MAP.md`, fails, and the fix is one `git mv`. A `**Term**:` line fails too:
+  that is the upstream format, and only a `###` entry under `## Glossary` is measured. The
+  entry format and its 200-word cap are unchanged. Where a `GLOSSARY-MAP.md` splits the
+  glossary by context, the rule says it did not check it. It is now named `glossary-format`.
+- The conformance rule about skill names now fails a repo skill that takes any name the `lab`
+  plugin ships, not only one that starts with `lab-`. The plugin now ships upstream skills
+  under their own names, and in Kimi Code a repo skill of the same name replaces the
+  plugin's without a word. The names come from Claude Code's copy of the plugin on your
+  machine. Where there is none, as in CI, only the `lab-` prefix is checked, and the rule
+  says it did not check the rest. It is now named `skill-name-clash`, so a waiver under the
+  old name waives nothing until you rename it.
+
 - The conformance rule about a second resolver now looks for four things instead of eight: a
   `poetry.lock`, `uv.lock`, `pdm.lock` or `Pipfile`, and the three tables that configure those
   resolvers. It no longer says anything about `requirements.txt`, `environment.yml`, `setup.py`
