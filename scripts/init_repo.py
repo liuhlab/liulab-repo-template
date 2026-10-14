@@ -106,6 +106,9 @@ TEMPLATE_ONLY = (
     "mkdocs.template.yml",
     "scripts/dogfood.py",
     "scripts/init_repo.py",
+    # Tests of the template's own configuration, not of the new repo's code.
+    "tests/test_conformance.py",
+    "tests/test_quoted_evidence.py",
 )
 
 #: The template's own records: the two decisions it made about its own gate and docs site, and

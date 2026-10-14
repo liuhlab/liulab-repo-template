@@ -33,9 +33,9 @@ never per-file. No expiry, and every waiver is printed on every run — green on
 because an escape hatch that stops being visible becomes permanent. Rule 1 refuses to be waived.
 
 This lives in `scripts/` and not `tests/` because one lab repo has neither `src/` nor `tests/`,
-and pytest is in no default environment. Its negative tests are `tests/test_conformance.py`: one
-tree per rule that violates it, because a rule that checks nothing passes the happy path and a
-gate that fires on nothing looks identical to a gate that passes.
+and pytest is in no default environment. Each rule is tested against a tree that violates it,
+because a rule that checks nothing passes the happy path and a gate that fires on nothing looks
+identical to a gate that passes.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ import yaml
 #: `CANNOT_RUN` is the one that says nothing about this repo's rules: `scripts/check.sh` already
 #: spells "could not run" as 2 — a usage error, a capture directory it could not make — and a
 #: checker that exited 1 for both would have every reader looking for a rule violation instead of
-#: for the missing checkout. `tests/test_conformance.py` asserts all three.
+#: for the missing checkout.
 PASSED, FAILED, CANNOT_RUN = 0, 1, 2
 
 
@@ -143,6 +143,8 @@ FIRST_TAG = "v0.0.0"
 #: Vale's spelling of on and off. Both forms appear in the wild; the gate accepts either.
 VALE_ON = {"YES", "TRUE", "ON"}
 VALE_OFF = {"NO", "FALSE", "OFF"}
+#: A key holding one of these is a glob, and a glob key matches no file.
+GLOB_CHARS = frozenset("*?[")
 
 #: The command a workflow step is allowed to run, and the table its task must be declared in.
 #: Both are named here because rule 12's problem text and its fix both spell them.
@@ -1028,6 +1030,9 @@ def rule_agent_docs_unpublished(repo: Repo) -> Result:
         result.notes.append(f"not checked: no [tool.liulab.agent-docs] key is under {prefix}")
         return result
     pages = sorted({p for key in keys for p in repo.under(key) if p.endswith(".md")})
+    if not pages:
+        result.notes.append(f"not checked: no markdown file is under {', '.join(keys)}")
+        return result
     for page in pages:
         text = repo.read(page)
         if text is not None and not _excluded_from_search(text):
@@ -1077,6 +1082,22 @@ def rule_vale_length_sections(repo: Repo) -> Result:
     # adding a third cap needs no edit here.
     caps = sorted({v for v in repo.agent_docs.values() if isinstance(v, str)})
     for key, declared in sorted(repo.agent_docs.items()):
+        first_glob = next((i for i, ch in enumerate(key) if ch in GLOB_CHARS), None)
+        if first_glob is not None:
+            # A glob in an earlier segment would widen the prefix past the directories it named.
+            in_last_segment = "/" not in key[first_glob:].rstrip("/")
+            plain = key[: key.rfind("/", 0, first_glob) + 1] if in_last_segment else ""
+            result.problems.append(
+                _problem(
+                    f"`{key}` is a glob, and agent-docs keys are plain path prefixes",
+                    "rule 2 matches keys as prefixes, so a glob matches no file and its pages "
+                    "are checked by nothing, while its .vale.ini section still looks paired",
+                    f"use `{plain}`, or one key per directory it was meant to cover"
+                    if plain
+                    else "use one plain key per directory it was meant to cover",
+                )
+            )
+            continue
         matched = [(header, settings) for header, settings in sections if key in header]
         if len(matched) != 1:
             result.problems.append(

@@ -446,6 +446,19 @@ def test_rule_2_follows_a_docs_dir_the_site_moved(repo: Path) -> None:
     assert "not checked: no [tool.liulab.agent-docs] key is under site-source/" in flat(proc.stdout)
 
 
+def test_rule_2_is_not_checked_when_its_keys_match_no_page(repo: Path) -> None:
+    # A derived repo may have no agent pages on its site, so this is `--` and not a failure; but
+    # it read nothing, so it is not `ok` either.
+    for rel in ("docs/agents/writing.md", "docs/adr/0001-a-decision.md", "docs/research/a-note.md"):
+        (repo / rel).unlink()
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["agent-docs-unpublished"] == "--"
+    assert "not checked: no markdown file is under docs/adr/, docs/agents/, docs/research/" in flat(
+        proc.stdout
+    )
+
+
 def test_rule_3_fires_when_a_section_turns_the_declared_cap_off(repo: Path) -> None:
     # The config this reproduces is not hypothetical: it is what left the ADRs checked by
     # nothing. Every rule is present, so asserting mere presence would call this green.
@@ -472,6 +485,47 @@ def test_rule_3_does_not_require_a_key_for_every_header_token(repo: Path) -> Non
     proc = conformance(repo)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert statuses(proc)["vale-length-sections"] == "ok"
+
+
+def test_rule_3_fires_on_a_key_that_is_a_glob(repo: Path) -> None:
+    # The section spells the key verbatim, so substring pairing alone would call this green while
+    # rule 2 resolves the key to nothing.
+    write(
+        repo,
+        "pyproject.toml",
+        PYPROJECT.replace('"docs/adr/"', '"docs/*/notes/" = false\n"docs/adr/"'),
+    )
+    write(
+        repo,
+        ".vale.ini",
+        VALE_INI
+        + "\n[docs/*/notes/**/*.md]\nBasedOnStyles = Lab\nLab.LengthDoc = NO\nLab.LengthAdr = NO\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["vale-length-sections"] == "FAIL"
+    message = flat(proc.stderr)
+    assert "`docs/*/notes/` is a glob" in message
+    # `docs/` would also cover the published pages, so only per-directory advice is safe.
+    assert "use `docs/`" not in message
+    assert "use one plain key per directory" in message
+
+
+def test_rule_3_suggests_the_directory_of_a_last_segment_glob(repo: Path) -> None:
+    write(
+        repo,
+        "pyproject.toml",
+        PYPROJECT.replace('"docs/adr/"', '"docs/agents/*.md" = false\n"docs/adr/"'),
+    )
+    write(
+        repo,
+        ".vale.ini",
+        VALE_INI
+        + "\n[docs/agents/*.md]\nBasedOnStyles = Lab\nLab.LengthDoc = NO\nLab.LengthAdr = NO\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert "use `docs/agents/`" in flat(proc.stderr)
 
 
 def test_rule_4_fires_on_an_overlong_glossary_entry(repo: Path) -> None:

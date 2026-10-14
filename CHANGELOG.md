@@ -66,6 +66,11 @@ sets one.
 
 ### Changed
 
+- A new repo no longer ships the template's tests of its own settings,
+  `tests/test_conformance.py` and `tests/test_quoted_evidence.py`. They tested the template,
+  not the new repo, and they made every test run there slower. The template keeps both and
+  still runs them. A repo made earlier can delete both files, and drop any `--ignore` it
+  added for them.
 - The glossary is now `GLOSSARY.md`, the name the upstream skills read and write, and its
   conformance rule checks more. A repo whose glossary is still `CONTEXT.md`, or whose map is
   still `CONTEXT-MAP.md`, fails, and the fix is one `git mv`. A `**Term**:` line fails too:
@@ -132,6 +137,10 @@ sets one.
 
 ### Fixed
 
+- `conformance` no longer passes a `[tool.liulab.agent-docs]` key that checks nothing. A key
+  with `*`, `?` or `[` in it now fails, because keys are plain path prefixes and a pattern
+  matches no file. Where the keys under the site source match no Markdown page, the check of
+  those pages reports `--` (not checked) and names the keys, where it used to say `ok`.
 - `init-repo` now makes the first commit and the `v0.0.0` tag under the name and email your
   git already has. It used to sign both as `init-repo <init-repo@localhost>` whatever git had,
   so every new repo began with a commit linked to no GitHub account. That stand-in is now used
