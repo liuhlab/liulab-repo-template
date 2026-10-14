@@ -66,10 +66,11 @@ CLI_DEPENDENCY = "typer"
 
 #: What this repo says about ITSELF: its own records — how it chose its docs site, what its gate
 #: deliberately does not check, and the evidence behind the rules it ships — the two files that
-#: publish it as the template, the page describing it and the config that names the site after
-#: it, and the two test files that exercise its own configuration. Spelled out here rather than imported from `scripts/init_repo.py`, for the reason
-#: the two constants above are: an assertion that reads its expectation out of the thing it is
-#: checking cannot tell a deletion that ran from a list that quietly lost an entry.
+#: publish it as the template, the page describing it and the config that names the site after it,
+#: and the two test files that exercise its own configuration. Spelled out here rather than imported
+#: from `scripts/init_repo.py`, for the reason the two constants above are: an assertion that reads
+#: its expectation out of the thing it is checking cannot tell a deletion that ran from a list that
+#: quietly lost an entry.
 TEMPLATE_ARTIFACTS = (
     "docs/adr/0001-docs-site-on-zensical.md",
     "docs/adr/0002-what-the-gate-does-not-check.md",

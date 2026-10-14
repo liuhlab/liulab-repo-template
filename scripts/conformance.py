@@ -143,7 +143,7 @@ FIRST_TAG = "v0.0.0"
 #: Vale's spelling of on and off. Both forms appear in the wild; the gate accepts either.
 VALE_ON = {"YES", "TRUE", "ON"}
 VALE_OFF = {"NO", "FALSE", "OFF"}
-# A key holding one of these is a glob, and `Repo.under()` matches it to nothing.
+#: A key holding one of these is a glob, and a glob key matches no file.
 GLOB_CHARS = frozenset("*?[")
 
 #: The command a workflow step is allowed to run, and the table its task must be declared in.
@@ -1082,9 +1082,11 @@ def rule_vale_length_sections(repo: Repo) -> Result:
     # adding a third cap needs no edit here.
     caps = sorted({v for v in repo.agent_docs.values() if isinstance(v, str)})
     for key, declared in sorted(repo.agent_docs.items()):
-        glob = next((i for i, ch in enumerate(key) if ch in GLOB_CHARS), None)
-        if glob is not None:
-            plain = key[: key.rfind("/", 0, glob) + 1]
+        first_glob = next((i for i, ch in enumerate(key) if ch in GLOB_CHARS), None)
+        if first_glob is not None:
+            # A glob in an earlier segment would widen the prefix past the directories it named.
+            in_last_segment = "/" not in key[first_glob:].rstrip("/")
+            plain = key[: key.rfind("/", 0, first_glob) + 1] if in_last_segment else ""
             result.problems.append(
                 _problem(
                     f"`{key}` is a glob, and agent-docs keys are plain path prefixes",

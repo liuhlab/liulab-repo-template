@@ -506,7 +506,26 @@ def test_rule_3_fires_on_a_key_that_is_a_glob(repo: Path) -> None:
     assert statuses(proc)["vale-length-sections"] == "FAIL"
     message = flat(proc.stderr)
     assert "`docs/*/notes/` is a glob" in message
-    assert "use `docs/`" in message
+    # `docs/` would also cover the published pages, so only per-directory advice is safe.
+    assert "use `docs/`" not in message
+    assert "use one plain key per directory" in message
+
+
+def test_rule_3_suggests_the_directory_of_a_last_segment_glob(repo: Path) -> None:
+    write(
+        repo,
+        "pyproject.toml",
+        PYPROJECT.replace('"docs/adr/"', '"docs/agents/*.md" = false\n"docs/adr/"'),
+    )
+    write(
+        repo,
+        ".vale.ini",
+        VALE_INI
+        + "\n[docs/agents/*.md]\nBasedOnStyles = Lab\nLab.LengthDoc = NO\nLab.LengthAdr = NO\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert "use `docs/agents/`" in flat(proc.stderr)
 
 
 def test_rule_4_fires_on_an_overlong_glossary_entry(repo: Path) -> None:
