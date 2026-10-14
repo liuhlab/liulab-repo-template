@@ -143,6 +143,8 @@ FIRST_TAG = "v0.0.0"
 #: Vale's spelling of on and off. Both forms appear in the wild; the gate accepts either.
 VALE_ON = {"YES", "TRUE", "ON"}
 VALE_OFF = {"NO", "FALSE", "OFF"}
+# A key holding one of these is a glob, and `Repo.under()` matches it to nothing.
+GLOB_CHARS = frozenset("*?[")
 
 #: The command a workflow step is allowed to run, and the table its task must be declared in.
 #: Both are named here because rule 12's problem text and its fix both spell them.
@@ -1028,6 +1030,9 @@ def rule_agent_docs_unpublished(repo: Repo) -> Result:
         result.notes.append(f"not checked: no [tool.liulab.agent-docs] key is under {prefix}")
         return result
     pages = sorted({p for key in keys for p in repo.under(key) if p.endswith(".md")})
+    if not pages:
+        result.notes.append(f"not checked: no markdown file is under {', '.join(keys)}")
+        return result
     for page in pages:
         text = repo.read(page)
         if text is not None and not _excluded_from_search(text):
@@ -1077,6 +1082,20 @@ def rule_vale_length_sections(repo: Repo) -> Result:
     # adding a third cap needs no edit here.
     caps = sorted({v for v in repo.agent_docs.values() if isinstance(v, str)})
     for key, declared in sorted(repo.agent_docs.items()):
+        glob = next((i for i, ch in enumerate(key) if ch in GLOB_CHARS), None)
+        if glob is not None:
+            plain = key[: key.rfind("/", 0, glob) + 1]
+            result.problems.append(
+                _problem(
+                    f"`{key}` is a glob, and agent-docs keys are plain path prefixes",
+                    "rule 2 matches keys as prefixes, so a glob matches no file and its pages "
+                    "are checked by nothing, while its .vale.ini section still looks paired",
+                    f"use `{plain}`, or one key per directory it was meant to cover"
+                    if plain
+                    else "use one plain key per directory it was meant to cover",
+                )
+            )
+            continue
         matched = [(header, settings) for header, settings in sections if key in header]
         if len(matched) != 1:
             result.problems.append(

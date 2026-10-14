@@ -137,6 +137,10 @@ sets one.
 
 ### Fixed
 
+- `conformance` no longer passes a `[tool.liulab.agent-docs]` key that checks nothing. A key
+  with `*`, `?` or `[` in it now fails, because keys are plain path prefixes and a pattern
+  matches no file. Where the keys under the site source match no Markdown page, the check of
+  those pages reports `--` (not checked) and names the keys, where it used to say `ok`.
 - `init-repo` now makes the first commit and the `v0.0.0` tag under the name and email your
   git already has. It used to sign both as `init-repo <init-repo@localhost>` whatever git had,
   so every new repo began with a commit linked to no GitHub account. That stand-in is now used
