@@ -33,9 +33,9 @@ never per-file. No expiry, and every waiver is printed on every run — green on
 because an escape hatch that stops being visible becomes permanent. Rule 1 refuses to be waived.
 
 This lives in `scripts/` and not `tests/` because one lab repo has neither `src/` nor `tests/`,
-and pytest is in no default environment. Its negative tests are `tests/test_conformance.py`: one
-tree per rule that violates it, because a rule that checks nothing passes the happy path and a
-gate that fires on nothing looks identical to a gate that passes.
+and pytest is in no default environment. Each rule is tested against a tree that violates it,
+because a rule that checks nothing passes the happy path and a gate that fires on nothing looks
+identical to a gate that passes.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ import yaml
 #: `CANNOT_RUN` is the one that says nothing about this repo's rules: `scripts/check.sh` already
 #: spells "could not run" as 2 — a usage error, a capture directory it could not make — and a
 #: checker that exited 1 for both would have every reader looking for a rule violation instead of
-#: for the missing checkout. `tests/test_conformance.py` asserts all three.
+#: for the missing checkout.
 PASSED, FAILED, CANNOT_RUN = 0, 1, 2
 
 

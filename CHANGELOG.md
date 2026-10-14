@@ -66,6 +66,11 @@ sets one.
 
 ### Changed
 
+- A new repo no longer ships the template's tests of its own settings,
+  `tests/test_conformance.py` and `tests/test_quoted_evidence.py`. They tested the template,
+  not the new repo, and they made every test run there slower. The template keeps both and
+  still runs them. A repo made earlier can delete both files, and drop any `--ignore` it
+  added for them.
 - The glossary is now `GLOSSARY.md`, the name the upstream skills read and write, and its
   conformance rule checks more. A repo whose glossary is still `CONTEXT.md`, or whose map is
   still `CONTEXT-MAP.md`, fails, and the fix is one `git mv`. A `**Term**:` line fails too:
