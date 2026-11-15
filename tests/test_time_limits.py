@@ -112,3 +112,59 @@ def test_the_slow_lane_holds_a_slow_test_to_neither_limit(pytester: pytest.Pytes
     result = pytester.runpytest(*slow_lane())
     result.assert_outcomes(passed=1)
     assert result.ret == pytest.ExitCode.OK
+
+
+def test_a_run_with_a_slow_test_is_not_held_to_the_budget(pytester: pytest.Pytester) -> None:
+    # Workers run slow tests side by side, so wall time less their summed durations means
+    # nothing; a run that includes one says so instead of failing on it.
+    tests = """
+import pytest
+
+
+@pytest.mark.slow
+def test_marked():
+    pass
+
+
+def test_quick():
+    pass
+"""
+    scratch(pytester, tests, timeout=1, budget=0.001)
+    result = pytester.runpytest("-m", "")
+    result.assert_outcomes(passed=2)
+    assert result.ret == pytest.ExitCode.OK
+    result.stdout.fnmatch_lines(["suite time: not checked*slow*"])
+
+
+def test_a_test_named_slow_but_not_marked_is_held_to_the_budget(
+    pytester: pytest.Pytester,
+) -> None:
+    tests = """
+import pytest
+
+
+@pytest.mark.parametrize("speed", ["slow"])
+def test_quick(speed):
+    pass
+"""
+    scratch(pytester, tests, timeout=1, budget=0.001)
+    result = pytester.runpytest()
+    result.assert_outcomes(passed=1)
+    assert result.ret == pytest.ExitCode.TESTS_FAILED
+    result.stdout.fnmatch_lines(["suite time: * s, over its 0.001 s budget*"])
+
+
+class AsWorker:
+    """Makes a run look like a pytest-xdist worker, which xdist marks with `workerinput`."""
+
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_configure(self, config: pytest.Config) -> None:
+        config.workerinput = {}  # type: ignore[attr-defined]
+
+
+def test_a_worker_leaves_the_budget_to_the_controller(pytester: pytest.Pytester) -> None:
+    scratch(pytester, "def test_quick():\n    pass\n", timeout=1, budget=0.001)
+    result = pytester.runpytest(plugins=[AsWorker()])
+    result.assert_outcomes(passed=1)
+    assert result.ret == pytest.ExitCode.OK
+    result.stdout.no_fnmatch_line("suite time:*")

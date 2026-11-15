@@ -153,6 +153,12 @@ sets one.
 
 ### Fixed
 
+- The suite budget now works under pytest-xdist. A run in which a `slow` test ran is no longer
+  timed and prints `suite time: not checked, because slow tests ran`, because tests that run
+  side by side cost less wall time than their durations add up to. The budget is set up only
+  in the main process, not in each worker. The `slow` mark, not a test's name, still decides
+  what counts as slow. A run that mixes slow and other tests (`-m ""`) is no longer held to the
+  budget. A repo made earlier can copy `conftest.py` from this one.
 - A new repo's README now names the lab's plugin as it is published:
   `/plugin marketplace add liuhlab/liulab-skills`, then `/plugin install lab@liulab`. The
   template's own README does too.

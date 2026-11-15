@@ -8,20 +8,41 @@ to neither, and the default run deselects it.
 from __future__ import annotations
 
 import time
+from typing import TYPE_CHECKING
 
 import pytest
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 SLOW = "slow"
+# What a `slow` test's reports carry. The marker itself, not `report.keywords`, which also holds
+# parametrize ids and folder names; xdist carries `user_properties` from worker to controller.
+SLOW_PROPERTY = (SLOW, True)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(
+    item: pytest.Item,
+) -> Generator[None, pytest.TestReport, pytest.TestReport]:
+    """Tag each report of a `slow` test with `SLOW_PROPERTY`."""
+    report = yield
+    if item.get_closest_marker(SLOW):
+        report.user_properties.append(SLOW_PROPERTY)
+    return report
 
 
 class SuiteBudget:
-    """Times one run, less its `slow` tests, and fails it when that is over budget."""
+    """Times one run and fails it when that is over budget; a run with a `slow` test is not timed.
+
+    Workers run slow tests side by side, so no sum of their durations can be taken off the wall
+    time.
+    """
 
     def __init__(self, budget: float) -> None:
         self.budget = budget
         self.started = time.perf_counter()
-        self.slow_ids: set[str] = set()
-        self.slow_seconds = 0.0
+        self.slow = False
         self.over = False
         self.verdict = ""
 
@@ -29,28 +50,24 @@ class SuiteBudget:
         """Start the clock where pytest starts its own."""
         self.started = time.perf_counter()
 
-    def pytest_collection_modifyitems(self, items: list[pytest.Item]) -> None:
-        """Note which tests carry the mark. Keywords would also match a directory named `slow`."""
-        self.slow_ids = {item.nodeid for item in items if item.get_closest_marker(SLOW)}
-
     def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
-        """Count a `slow` test's setup, call and teardown, so the budget leaves them out."""
-        if report.nodeid in self.slow_ids:
-            self.slow_seconds += report.duration
+        """Note that a `slow` test ran."""
+        if SLOW_PROPERTY in report.user_properties:
+            self.slow = True
 
     @pytest.hookimpl(trylast=True)
     def pytest_sessionfinish(self, session: pytest.Session) -> None:
-        """Fail a run that took longer than its budget."""
-        took = time.perf_counter() - self.started - self.slow_seconds
-        excluded = (
-            f" ({self.slow_seconds:.1f} s of slow tests not counted)" if self.slow_seconds else ""
-        )
+        """Fail a run with no `slow` test that took longer than its budget."""
+        if self.slow:
+            self.verdict = "suite time: not checked, because slow tests ran"
+            return
+        took = time.perf_counter() - self.started
         self.over = took > self.budget
         if not self.over:
-            self.verdict = f"suite time: {took:.1f} s of its {self.budget:g} s budget{excluded}"
+            self.verdict = f"suite time: {took:.1f} s of its {self.budget:g} s budget"
             return
         self.verdict = (
-            f"suite time: {took:.1f} s, over its {self.budget:g} s budget{excluded}. "
+            f"suite time: {took:.1f} s, over its {self.budget:g} s budget. "
             "Find the slowest tests with --durations=10, then make them faster or mark them slow."
         )
         if session.exitstatus == pytest.ExitCode.OK:
@@ -65,7 +82,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     """Register `suite_budget`."""
     parser.addini(
         "suite_budget",
-        "Most seconds a run may take, slow tests excluded. 0 or unset: no budget.",
+        "Most seconds a run without slow tests may take. 0 or unset: no budget.",
         type="float",
         default=0.0,
     )
@@ -78,7 +95,8 @@ def pytest_configure(config: pytest.Config) -> None:
         f"{SLOW}: exempt from timeout and suite_budget, and deselected unless -m {SLOW}",
     )
     budget = config.getini("suite_budget")
-    if budget:
+    # The controller alone: an xdist worker times only its share of the run.
+    if budget and not hasattr(config, "workerinput"):
         config.pluginmanager.register(SuiteBudget(budget), "suite-budget")
 
 
