@@ -181,3 +181,12 @@ sets one.
   git already has. It used to sign both as `init-repo <init-repo@localhost>` whatever git had,
   so every new repo began with a commit linked to no GitHub account. That stand-in is now used
   only when git has no name or no email, as on a fresh CI runner.
+- The suite budget works under pytest-xdist. The process that reports a parallel run collects
+  no tests, so it never learned which tests were marked `slow` and counted their time against
+  the budget. A slow test's report now carries the mark. A run in which any slow test ran is
+  not timed at all, and prints `suite time: not checked, because slow tests ran`, so a run of
+  every test with `-m ""` is not timed either. Only the reporting process keeps a budget,
+  not each worker. A repo made earlier can copy `conftest.py` from this one.
+- The suite budget's clock stops when the last test ends. pytest deletes its old temporary
+  folders after that, and on a machine that keeps many of them, the deletion used to push a
+  local run past a budget that CI met.
