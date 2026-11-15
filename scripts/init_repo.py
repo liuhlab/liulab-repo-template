@@ -1223,7 +1223,7 @@ def readme(identity: Identity) -> str:
         "",
         "## Read the docs",
         "",
-        f"The site is at <{identity.site_url}>.",
+        f"When this repo is public, its site is at <{identity.site_url}>.",
         "Build it yourself with `pixi run docs-build`.",
         "",
         "## Set up your agent",
@@ -1234,11 +1234,11 @@ def readme(identity: Identity) -> str:
         "python skills/install.py --target all",
         "```",
         "",
-        "If you work on the lab's clusters, add the shared plugin once per machine:",
+        "The lab's shared skills come as a Claude Code plugin. Add it once per machine:",
         "",
         "```text",
-        "/plugin marketplace add liuhlab/liulab-compute-skills",
-        "/plugin install lab-compute@liulab",
+        "/plugin marketplace add liuhlab/liulab-skills",
+        "/plugin install lab@liulab",
         "```",
         "",
     ]
@@ -1316,7 +1316,10 @@ def next_steps(identity: Identity, tag: str | None, *, pushed: bool) -> list[str
         f"echo '{ruleset_body(REQUIRED_CHECKS)}' | "
         f"gh api --method POST repos/{identity.owner}/{identity.repo}/rulesets --input -"
     )
-    steps.append("Turn on GitHub Pages for the `gh-pages` branch to publish the site.")
+    steps.append(
+        "If this repo is public, turn on GitHub Pages for the `gh-pages` branch to publish the "
+        "site. A private repo skips the deploy."
+    )
     return steps
 
 

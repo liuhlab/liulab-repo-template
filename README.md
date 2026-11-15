@@ -70,12 +70,12 @@ path. Other agent tools need one command:
 python skills/install.py --target all
 ```
 
-The lab's shared skills for clusters, containers and Jupyter come as a Claude Code plugin.
-Add it once per machine:
+The lab's shared skills, for clusters, containers, Jupyter and day-to-day coding, come as a
+Claude Code plugin. Add it once per machine:
 
 ```text
-/plugin marketplace add liuhlab/liulab-compute-skills
-/plugin install lab-compute@liulab
+/plugin marketplace add liuhlab/liulab-skills
+/plugin install lab@liulab
 ```
 
 Those two lines set up your machine, not this repo. The repo is public, and the plugin is

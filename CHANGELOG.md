@@ -148,6 +148,13 @@ sets one.
 
 ### Fixed
 
+- A new repo's README now names the lab's plugin as it is published:
+  `/plugin marketplace add liuhlab/liulab-skills`, then `/plugin install lab@liulab`. The
+  template's own README does too.
+- No comment a new repo keeps cites an issue number from this template's tracker. Each says
+  its reason in words, and the dogfood render now fails on a `(#NN)` in any file it keeps.
+- `docs.yml` skips the deploy in a private repo, where a free plan cannot serve GitHub Pages. The
+  closing checklist and the new README say the site is for a public repo.
 - `conformance` no longer passes a `[tool.liulab.agent-docs]` key that checks nothing. A key
   with `*`, `?` or `[` in it now fails, because keys are plain path prefixes and a pattern
   matches no file. Where the keys under the site source match no Markdown page, the check of
