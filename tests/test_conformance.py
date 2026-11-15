@@ -42,7 +42,7 @@ SYMLINKS_STATUS = "ok" if INSTALLER.exists() else "--"
 SYMLINKS_NOTE = "1 skill" if INSTALLER.exists() else "not checked: no skills/install.py"
 
 # Spelled in two pieces for the same reason `conformance.py` spells it that way: `init-repo`
-# substitutes the placeholder through the whole tree and the dogfood job then greps a rendered
+# substitutes the placeholder through the whole tree and the dogfood step then greps a rendered
 # repo for it. A literal here would be rewritten, and would be found.
 PLACEHOLDER = "new" + "pkg"
 
@@ -1608,17 +1608,24 @@ def test_rule_13_reads_a_site_config_that_will_not_parse_as_empty(repo: Path) ->
     assert "not checked: mkdocs.broken.yml declares no `nav:`" in flat(proc.stdout)
 
 
-def test_rule_14_fires_on_a_timeout_set_in_a_workflow(repo: Path) -> None:
+@pytest.mark.parametrize(
+    ("planted", "named"),
+    [
+        (f"    env:\n      {TIMEOUT_ENV}: 60\n", f"sets `{TIMEOUT_ENV}`"),
+        ("    env:\n      PYTEST_ADDOPTS: --timeout=60\n", "passes `--timeout`"),
+    ],
+)
+def test_rule_14_fires_on_a_timeout_set_in_a_workflow(repo: Path, planted: str, named: str) -> None:
     write(
         repo,
         ".github/workflows/ci.yml",
         "name: ci\non:\n  pull_request:\njobs:\n  check:\n    runs-on: ubuntu-latest\n"
-        f"    env:\n      {TIMEOUT_ENV}: 60\n    steps:\n      - run: pixi run test\n",
+        f"{planted}    steps:\n      - run: pixi run test\n",
     )
     proc = conformance(repo)
     assert proc.returncode == 1
     assert statuses(proc)["test-time-limits"] == "FAIL"
-    assert f".github/workflows/ci.yml sets `{TIMEOUT_ENV}`" in proc.stderr
+    assert f".github/workflows/ci.yml {named}" in proc.stderr
 
 
 def test_rule_14_fires_on_a_pytest_task_and_not_on_another_tools_timeout(repo: Path) -> None:
@@ -1633,6 +1640,22 @@ def test_rule_14_fires_on_a_pytest_task_and_not_on_another_tools_timeout(repo: P
     assert statuses(proc)["test-time-limits"] == "FAIL"
     assert "pixi task `test-ci` passes `--timeout`" in proc.stderr
     assert "`fetch`" not in proc.stderr
+
+
+def test_rule_14_fires_on_the_environment_variable_wherever_pixi_sets_it(repo: Path) -> None:
+    # Unlike `--timeout`, the variable reaches pytest through any task, so no task is passed over.
+    pixi = (
+        f'ci = {{ cmd = "pixi run test", env = {{ {TIMEOUT_ENV} = "60" }} }}\n\n'
+        f'[tool.pixi.activation.env]\n{TIMEOUT_ENV} = "60"\n'
+    )
+    write(
+        repo, "pyproject.toml", PYPROJECT.replace('test = "pytest"\n', f'test = "pytest"\n{pixi}')
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["test-time-limits"] == "FAIL"
+    assert f"pixi task `ci` sets `{TIMEOUT_ENV}`" in proc.stderr
+    assert f"[tool.pixi] sets `{TIMEOUT_ENV}` outside a task" in proc.stderr
 
 
 def test_rule_14_fires_on_a_timeout_mark_in_a_test(repo: Path) -> None:

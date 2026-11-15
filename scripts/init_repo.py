@@ -162,6 +162,17 @@ MARKED_BLOCKS = (
     ("docs/index.md", "template-docs"),
 )
 
+#: The paragraph in `AGENTS.md` on pytest's time limits, which a repo with no tests cuts.
+AGENTS_TIME_LIMITS = (
+    "Test time has two limits, set in `[tool.pytest.ini_options]` and nowhere else:\n"
+    "\n"
+    "- **`timeout`** caps one test, setup and teardown included.\n"
+    "- **`suite_budget`** caps the whole run; every run prints its time against it.\n"
+    "- **The slow lane:** a test marked `slow` is held to neither, and runs only in\n"
+    "  `pixi run test-slow`.\n"
+    "\n"
+)
+
 #: The task lines a repo with no package has no use for, matched whole.
 TASKS_A_PACKAGE_NEEDS = frozenset(
     {'test = "pytest"', 'test-slow = "pytest -m slow"', 'build = "python -m build"'}
@@ -948,6 +959,21 @@ class Init:
         )
         self.prune_cli_dependency()
         self.edit("pixi.lock", "the editable install of this repo", drop_lock_self_reference)
+        self.edit(
+            ".github/workflows/ci.yml",
+            "the full-history checkout the build step needed",
+            lambda text: _replace(
+                text,
+                "        with:\n"
+                "          # Full history, because `build` needs the tags: the version is dynamic "
+                "and\n"
+                "          # hatch-vcs reads the newest tag, so a shallow clone would stamp a "
+                "released commit\n"
+                "          # as a dev build.\n"
+                "          fetch-depth: 0\n",
+                "",
+            ),
+        )
         for what, step in (
             ("test", "- run: pixi run test\n"),
             ("build", "- run: pixi run build\n"),
@@ -988,6 +1014,11 @@ class Init:
                 f"import name **`{PLACEHOLDER_MODULE}`**.",
                 "",
             ),
+        )
+        self.edit(
+            "AGENTS.md",
+            "the test time limits",
+            lambda text: _replace(text, AGENTS_TIME_LIMITS, ""),
         )
         self.edit(
             "AGENTS.md",
@@ -1275,15 +1306,14 @@ def next_steps(identity: Identity, tag: str | None, *, pushed: bool) -> list[str
             "environment `pypi`. There is no API token in this repo, and there must never be one."
         )
         steps.append("Publish a GitHub Release to release. Pushing a tag does not publish.")
-    checks = REQUIRED_CHECKS
     steps.append(
         "Clone the lab's labels — a template copies none, so `--label ready-for-agent` fails "
         "until you do:\n"
         f"gh label clone {LABEL_SOURCE} --force --repo {identity.owner}/{identity.repo}"
     )
     steps.append(
-        f"Require a pull request and this repo's own checks ({', '.join(checks)}) on `main`:\n"
-        f"echo '{ruleset_body(checks)}' | "
+        f"Require a pull request and this repo's own checks ({', '.join(REQUIRED_CHECKS)}) on `main`:\n"
+        f"echo '{ruleset_body(REQUIRED_CHECKS)}' | "
         f"gh api --method POST repos/{identity.owner}/{identity.repo}/rulesets --input -"
     )
     steps.append("Turn on GitHub Pages for the `gh-pages` branch to publish the site.")

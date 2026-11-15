@@ -75,7 +75,7 @@ class CannotRunError(Exception):
 
 
 #: The template's placeholder module name, SPELLED IN TWO PIECES on purpose. `init-repo`
-#: substitutes that name throughout the tree and the dogfood job then greps a rendered repo for
+#: substitutes that name throughout the tree and the dogfood step then greps a rendered repo for
 #: it. A literal here would be rewritten — turning rule 1 into a check for the new module's own
 #: name, which is everywhere — and would leave a copy for that grep to find. Two pieces, and
 #: neither happens.
@@ -776,6 +776,18 @@ def _tasks(node: Any) -> Iterator[tuple[str, Any]]:
                 yield str(name), definition  # pyright: ignore[reportUnknownArgumentType]
         else:
             yield from _tasks(value)
+
+
+def _outside_tasks(node: Any) -> Iterator[str]:
+    """Every key and string under `[tool.pixi]` that is not inside a `tasks` table."""
+    if isinstance(node, dict):
+        for key, value in node.items():  # pyright: ignore[reportUnknownVariableType]
+            if key == "tasks" and isinstance(value, dict):
+                continue
+            yield str(key)  # pyright: ignore[reportUnknownArgumentType]
+            yield from _outside_tasks(value)
+    else:
+        yield from _keys_and_strings(node)
 
 
 def _keys_and_strings(node: Any) -> Iterator[str]:
@@ -1806,7 +1818,7 @@ def rule_nav_target_exists(repo: Repo) -> Result:
     return result
 
 
-def _timeouts_set(strings: Iterable[str]) -> list[str]:
+def _timeout_overrides(strings: Iterable[str]) -> list[str]:
     """Which of `PYTEST_TIMEOUT` and `--timeout` these strings set, as a problem's verb phrase."""
     joined = "\n".join(strings)
     found: list[str] = []
@@ -1821,11 +1833,13 @@ def rule_test_time_limits(repo: Repo) -> Result:
     """14. The test time limits are set in `[tool.pytest.ini_options]` and nowhere else.
 
     Three other places can set pytest-timeout's limit, and each beats the ini value: an
-    environment variable or a flag in a workflow, the same in a pixi task, and a mark on a test.
+    environment variable or a flag in a workflow, the same in pixi's tasks or activation, and a
+    mark on a test.
 
-    A task is read only when it runs pytest, because `--timeout` belongs to other tools too and a
-    download that waits for a server is not a test time limit. A workflow step can only invoke a
-    task (rule 12), so a `--timeout` there is read as one whichever task it goes to.
+    `--timeout` is read in a task only when the task runs pytest, because the flag belongs to
+    other tools too and a download that waits for a server is not a test time limit. A workflow
+    step can only invoke a task (rule 12), so a `--timeout` there is read as one whichever task it
+    goes to. `PYTEST_TIMEOUT` is read everywhere: it reaches pytest through any task that runs it.
     """
     result = Result()
     why = (
@@ -1838,16 +1852,21 @@ def rule_test_time_limits(repo: Repo) -> Result:
         "whole suite in [tool.pytest.ini_options]"
     )
     for workflow in repo.workflows:
-        for found in _timeouts_set(workflow.strings):
+        for found in _timeout_overrides(workflow.strings):
             result.problems.append(_problem(f"{workflow.path} {found}", why, fix))
     pytest_tasks = 0
     for name, definition in repo.task_definitions:
         strings = tuple(_keys_and_strings(definition))
-        if not any(_PYTEST_RE.search(string) for string in strings):
-            continue
-        pytest_tasks += 1
-        for found in _timeouts_set(strings):
-            result.problems.append(_problem(f"pixi task `{name}` {found}", why, fix))
+        runs_pytest = any(_PYTEST_RE.search(string) for string in strings)
+        pytest_tasks += runs_pytest
+        for found in _timeout_overrides(strings):
+            if runs_pytest or TIMEOUT_ENV in found:
+                result.problems.append(_problem(f"pixi task `{name}` {found}", why, fix))
+    pixi = repo.manifest.get("tool", {}).get("pixi")
+    if any(_TIMEOUT_ENV_RE.search(string) for string in _outside_tasks(pixi)):
+        result.problems.append(
+            _problem(f"[tool.pixi] sets `{TIMEOUT_ENV}` outside a task", why, fix)
+        )
     tests = [rel for rel in repo.tracked if _TEST_FILE_RE.search(rel)]
     for rel in tests:
         for number, line in enumerate((repo.read(rel) or "").splitlines(), start=1):
@@ -2006,8 +2025,9 @@ RULES: tuple[Rule, ...] = (
         14,
         "test-time-limits",
         f"the test time limits are `timeout` and `suite_budget` in [tool.pytest.ini_options], and "
-        f"nowhere else: no `{TIMEOUT_ENV}` or `{TIMEOUT_FLAG}` in a workflow or in a pixi task "
-        f"that runs pytest, and no `{TIMEOUT_MARK}` in a test",
+        f"nowhere else: no `{TIMEOUT_ENV}` in a workflow or anywhere under [tool.pixi], no "
+        f"`{TIMEOUT_FLAG}` in a workflow or in a pixi task that runs pytest, and no "
+        f"`{TIMEOUT_MARK}` in a test",
         rule_test_time_limits,
     ),
     Rule(

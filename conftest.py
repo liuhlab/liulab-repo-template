@@ -20,24 +20,33 @@ class SuiteBudget:
     def __init__(self, budget: float) -> None:
         self.budget = budget
         self.started = time.perf_counter()
-        self.slow = 0.0
+        self.slow_ids: set[str] = set()
+        self.slow_seconds = 0.0
+        self.over = False
         self.verdict = ""
 
     def pytest_sessionstart(self) -> None:
         """Start the clock where pytest starts its own."""
         self.started = time.perf_counter()
 
+    def pytest_collection_modifyitems(self, items: list[pytest.Item]) -> None:
+        """Note which tests carry the mark. Keywords would also match a directory named `slow`."""
+        self.slow_ids = {item.nodeid for item in items if item.get_closest_marker(SLOW)}
+
     def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
         """Count a `slow` test's setup, call and teardown, so the budget leaves them out."""
-        if SLOW in report.keywords:
-            self.slow += report.duration
+        if report.nodeid in self.slow_ids:
+            self.slow_seconds += report.duration
 
     @pytest.hookimpl(trylast=True)
     def pytest_sessionfinish(self, session: pytest.Session) -> None:
         """Fail a run that took longer than its budget."""
-        took = time.perf_counter() - self.started - self.slow
-        excluded = f" ({self.slow:.1f} s of slow tests not counted)" if self.slow else ""
-        if took <= self.budget:
+        took = time.perf_counter() - self.started - self.slow_seconds
+        excluded = (
+            f" ({self.slow_seconds:.1f} s of slow tests not counted)" if self.slow_seconds else ""
+        )
+        self.over = took > self.budget
+        if not self.over:
             self.verdict = f"suite time: {took:.1f} s of its {self.budget:g} s budget{excluded}"
             return
         self.verdict = (
@@ -49,8 +58,7 @@ class SuiteBudget:
 
     def pytest_terminal_summary(self, terminalreporter: pytest.TerminalReporter) -> None:
         """Print the time against the budget."""
-        over = "over its" in self.verdict
-        terminalreporter.write_line(self.verdict, red=over, bold=over)
+        terminalreporter.write_line(self.verdict, red=self.over, bold=self.over)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

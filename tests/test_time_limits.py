@@ -30,14 +30,22 @@ def test_takes_its_time():
 """
 
 
-def scratch(pytester: pytest.Pytester, tests: str, *, timeout: float, budget: float) -> None:
+def scratch(
+    pytester: pytest.Pytester,
+    tests: str,
+    *,
+    timeout: float,
+    budget: float,
+    where: str = "tests/test_scratch.py",
+) -> None:
     """A tree with this repo's pytest configuration, these limits, and one test file."""
     ini = dict(MANIFEST["tool"]["pytest"]["ini_options"], timeout=timeout, suite_budget=budget)
     lines = "".join(f"{key} = {json.dumps(value)}\n" for key, value in ini.items())
     pytester.makepyprojecttoml(f"[tool.pytest.ini_options]\n{lines}")
     pytester.makeconftest((REPO / "conftest.py").read_text(encoding="utf-8"))
-    (pytester.path / "tests").mkdir()
-    (pytester.path / "tests" / "test_scratch.py").write_text(tests, encoding="utf-8")
+    path = pytester.path / where
+    path.parent.mkdir(parents=True)
+    path.write_text(tests, encoding="utf-8")
 
 
 def slow_lane() -> list[str]:
@@ -54,9 +62,11 @@ def test_a_suite_inside_its_budget_passes_and_says_so(pytester: pytest.Pytester)
     result.stdout.fnmatch_lines(["suite time: * s of its 30 s budget"])
 
 
-def test_a_suite_past_its_budget_fails_the_run(pytester: pytest.Pytester) -> None:
+# The second place is a directory named `slow`, which an unmarked test is not exempted by.
+@pytest.mark.parametrize("where", ["tests/test_scratch.py", "tests/slow/test_scratch.py"])
+def test_a_suite_past_its_budget_fails_the_run(pytester: pytest.Pytester, where: str) -> None:
     tests = "import time\n\n\ndef test_sleeps():\n    time.sleep(0.3)\n"
-    scratch(pytester, tests, timeout=1, budget=0.1)
+    scratch(pytester, tests, timeout=1, budget=0.1, where=where)
     result = pytester.runpytest()
     result.assert_outcomes(passed=1)
     assert result.ret == pytest.ExitCode.TESTS_FAILED

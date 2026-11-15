@@ -56,7 +56,7 @@ is never subtracted.
 Before adding anything, decide which side of that line it is on. Template-only machinery
 must be **deletable by path**, and no file a derived repo keeps may name it — a pointer in
 a surviving file turns into a dangling reference in fifty repos. Generic files must not
-mention this skill, the dogfood job, or anything else that will not be there.
+mention this skill, the dogfood step, or anything else that will not be there.
 
 ## The records stay here
 
@@ -108,7 +108,7 @@ which is where the step list lives so that the local gate and CI cannot drift.
 
 It must be cheap, offline and deterministic. **An expensive, networked or non-deterministic
 check must never be able to fail a normal pull request** — that principle is why the
-release trigger and the template's own dogfood job are shaped the way they are. A check
+release trigger and the template's own dogfood step are shaped the way they are. A check
 that needs the network or an agent belongs in its own workflow, on its own trigger.
 
 Conformance rules state the rule broken rather than a rewritten assert, and each one is

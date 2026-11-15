@@ -311,7 +311,7 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
         "skills/init-repo": False,
         "skills/template-dev": False,
         "skills/install.py": True,
-        # Template machinery deletes itself, including the two scripts behind this job.
+        # Template machinery deletes itself, including the two scripts behind this step.
         "scripts/init_repo.py": False,
         "scripts/dogfood.py": False,
         "scripts/conformance.py": True,

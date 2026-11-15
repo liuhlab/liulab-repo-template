@@ -42,11 +42,12 @@ jobs:
     steps:
       # A real checkout, not a source archive: `conformance` shells out to `git ls-files`
       # and exits 2 without a `.git` — its "could not run", spelled apart from the 1 a
-      # broken rule exits, so a bad checkout never reads as a rule this repo failed. Full
-      # history, because `build` needs the tags: the version is dynamic and hatch-vcs reads
-      # the newest tag, and a shallow clone would stamp a released commit as a dev build.
+      # broken rule exits, so a bad checkout never reads as a rule this repo failed.
       - uses: actions/checkout@v7
         with:
+          # Full history, because `build` needs the tags: the version is dynamic and
+          # hatch-vcs reads the newest tag, so a shallow clone would stamp a released commit
+          # as a dev build.
           fetch-depth: 0
       - uses: prefix-dev/setup-pixi@v0.10.2
         with:
@@ -61,9 +62,11 @@ jobs:
       - run: pixi run test
         if: ${{ !cancelled() }}
       - run: pixi run build
+        id: build
         if: ${{ !cancelled() }}
       - uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() }}
+        # Only a wheel that was built: a failed build would otherwise fail this step too.
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         with:
           name: dist
           path: dist/
