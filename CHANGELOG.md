@@ -148,6 +148,10 @@ sets one.
 
 ### Fixed
 
+- A new repo with no package no longer describes tests it does not have. `init-repo` now cuts
+  the test step from the gate in `AGENTS.md`: the words "plus `test`", the `test` row, and the
+  four traps, which are all about pytest or typer. It also drops `mkdocstrings-python` from the
+  docs environment and from `pixi.lock`. That repo's site has no API page, so nothing used it.
 - `conformance` no longer passes a `[tool.liulab.agent-docs]` key that checks nothing. A key
   with `*`, `?` or `[` in it now fails, because keys are plain path prefixes and a pattern
   matches no file. Where the keys under the site source match no Markdown page, the check of
