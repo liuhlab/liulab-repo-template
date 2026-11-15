@@ -84,10 +84,9 @@ sets one.
   added for them.
 - The glossary is now `GLOSSARY.md`, the name the upstream skills read and write, and its
   conformance rule checks more. A repo whose glossary is still `CONTEXT.md`, or whose map is
-  still `CONTEXT-MAP.md`, fails, and the fix is one `git mv`. A `**Term**:` line fails too:
-  that is the upstream format, and only a `###` entry under `## Glossary` is measured. The
-  entry format and its 200-word cap are unchanged. Where a `GLOSSARY-MAP.md` splits the
-  glossary by context, the rule says it did not check it. It is now named `glossary-format`.
+  still `CONTEXT-MAP.md`, fails, and the fix is one `git mv`. The 200-word cap on each entry
+  is unchanged. Where a `GLOSSARY-MAP.md` splits the glossary by context, the rule says it did
+  not check it. It is now named `glossary-format`.
 - The conformance rule about skill names now fails a repo skill that takes any name the `lab`
   plugin ships, not only one that starts with `lab-`. The plugin now ships upstream skills
   under their own names, and in Kimi Code a repo skill of the same name replaces the
@@ -140,6 +139,9 @@ sets one.
 
 ### Removed
 
+- The pixi `test` environment. It had the same packages as `default`, and only a separate CI
+  test job used it. CI is now one job that runs in `default`, so every new repo carried the
+  environment and its part of `pixi.lock` for nothing.
 - The pages on the issue tracker, the triage labels and the domain docs are gone from
   `docs/agents/`. A machine set up with `/lab-setup` gives every agent all three as lab
   defaults, so a new repo needs none of them. Write your own page only where your repo is
@@ -151,6 +153,16 @@ sets one.
 - `pixi run check` now runs the tests when a static step fails, and exits non-zero if either
   failed. It used to stop at the first failing task, so one lint error hid every failing test.
   A repo made earlier with tests can copy the `check` line from this one.
+- The glossary rule now measures a glossary written the way the `domain-modeling` skill writes
+  it, and no longer fails it. A line that is only a bold term and a colon, `**Order**:`, starts
+  an entry under any `##` section, and the entry runs to the next such line or the next
+  heading. Each entry is held to the same 200-word cap as a `###` entry under `## Glossary`,
+  which is still measured as before. A glossary in the skill's layout used to fail on every
+  term line.
+- A new repo with no package no longer describes tests it does not have. `init-repo` now cuts
+  the test step from the gate in `AGENTS.md`: the words "plus `test`", the `test` row, and the
+  four traps, which are all about pytest or typer. It also drops `mkdocstrings-python` from the
+  docs environment and from `pixi.lock`. That repo's site has no API page, so nothing used it.
 - `conformance` no longer passes a `[tool.liulab.agent-docs]` key that checks nothing. A key
   with `*`, `?` or `[` in it now fails, because keys are plain path prefixes and a pattern
   matches no file. Where the keys under the site source match no Markdown page, the check of
