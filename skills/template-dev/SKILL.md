@@ -49,7 +49,7 @@ forever.
 ## Template-only, and how it leaves
 
 `init-repo` **subtracts**. It deletes this skill, the `init-repo` skill, their symlinks,
-and the CI job that renders the template. A repo that does not publish loses the release
+and the CI step that renders the template. A repo that does not publish loses the release
 workflow; a repo with no package also loses `src/` and `tests/`. The `CHANGELOG.md` file
 is never subtracted.
 

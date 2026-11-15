@@ -7,7 +7,7 @@ r"""The mechanical half of `init-repo`: everything the interview does not have t
 
 `skills/init-repo/SKILL.md` conducts the interview — four questions, all judgement. This
 script performs every action those answers imply, deterministically and without an agent, so
-the `dogfood` job can render the template for all three shapes on every pull request and prove
+the `dogfood` step can render the template for all three shapes on every pull request and prove
 each result is green.
 
 Actions come in two kinds, and only one of them is dangerous:
@@ -22,7 +22,7 @@ Actions come in two kinds, and only one of them is dangerous:
   asked the person.
 
 Exempt from that check, deleted unconditionally and tolerated when absent: the two skill
-directories, their four symlinks, the `dogfood` job and its task, `scripts/dogfood.py`, this
+directories, their four symlinks, the `dogfood` CI step and its task, `scripts/dogfood.py`, this
 file, the two files that publish this repo as the template — `docs/template/index.md` and the
 `mkdocs.template.yml` that names the site after it — and the template's own records, the two ADRs
 and the three research notes that say how the template was built and what its gate deliberately
@@ -33,7 +33,7 @@ of the template's entries is guarded, so a late init never discards what someone
 Everything else is an ANCHORED edit: it matches text the template ships and reports a miss
 rather than failing. A repo that rewrote the passage keeps what it wrote, and the one thing
 that must not survive — the placeholder name — is checked by conformance rule 1 in the
-rendered repo, so a missed anchor turns the dogfood job red instead of shipping quietly.
+rendered repo, so a missed anchor turns the dogfood step red instead of shipping quietly.
 
 The `no-package` shape prunes more than the spec's `src/` and `tests/`, because those two
 deletions alone do not leave a green repo: pixi cannot install a package with no source,
@@ -82,14 +82,9 @@ DEFAULT_OWNER = "liuhlab"
 #: someone clones these.
 LABEL_SOURCE = "liuhlab/liulab-repo-template"
 
-#: The `ci.yml` jobs each shape actually keeps. `no-package` deletes `test` and `build`, so a
-#: ruleset naming those would wait forever for a check that never reports, and every pull
-#: request in that repo would be unmergeable.
-SHAPE_CHECKS = {
-    "published": ("check", "test", "build", "docs"),
-    "not-published": ("check", "test", "build", "docs"),
-    "no-package": ("check", "docs"),
-}
+#: The `ci.yml` jobs a ruleset requires. There is one, in every shape: `no-package` cuts steps
+#: from it, never the job, so a ruleset never waits on a check that does not report.
+REQUIRED_CHECKS = ("check",)
 
 #: Deleted unconditionally, tolerated when absent, never checked against the first commit. This
 #: script is last, so everything else has already happened by the time it goes.
@@ -158,7 +153,7 @@ RECORD_POINTERS = (
 CHANGELOG_UNRELEASED = "## [Unreleased]"
 
 #: Files carrying an `init-repo:begin <name>` / `init-repo:end <name>` pair. Template-only text
-#: inside a file every repo keeps cannot be deleted by path — the dogfood job is one job in a
+#: inside a file every repo keeps cannot be deleted by path — the dogfood step is one step in a
 #: workflow, the front page's pointer at `docs/template/` is one paragraph of a page — so each
 #: ships delimited, and removing it stays mechanical instead of becoming YAML or prose surgery.
 MARKED_BLOCKS = (
@@ -168,7 +163,9 @@ MARKED_BLOCKS = (
 )
 
 #: The task lines a repo with no package has no use for, matched whole.
-TASKS_A_PACKAGE_NEEDS = frozenset({'test = "pytest"', 'build = "python -m build"'})
+TASKS_A_PACKAGE_NEEDS = frozenset(
+    {'test = "pytest"', 'test-slow = "pytest -m slow"', 'build = "python -m build"'}
+)
 
 #: The command line's framework, and the two lines `pyproject.toml` declares it on: the wheel's
 #: own requirement and the conda mirror pixi installs from. A repo that declined a command line
@@ -913,6 +910,7 @@ class Init:
         else:
             self.say("kept", "src/ and tests/ together — a package with no tests fails rule 8")
         self.remove("docs/api.md")
+        self.remove("conftest.py")
 
         for header in (
             "[project.scripts]",
@@ -944,25 +942,29 @@ class Init:
             "src and tests in the pyright scope",
             lambda text: _replace(
                 text,
-                'include = ["src", "tests", "scripts", "skills"]',
+                'include = ["src", "tests", "scripts", "skills", "conftest.py"]',
                 'include = ["scripts", "skills"]',
             ),
         )
         self.prune_cli_dependency()
         self.edit("pixi.lock", "the editable install of this repo", drop_lock_self_reference)
-        for job in ("test", "build"):
+        for what, step in (
+            ("test", "- run: pixi run test\n"),
+            ("build", "- run: pixi run build\n"),
+            ("wheel upload", "- uses: actions/upload-artifact@"),
+        ):
             self.edit(
                 ".github/workflows/ci.yml",
-                f"the {job} job",
-                lambda text, j=job: drop_indented_block(text, f"  {j}:"),
+                f"the {what} step",
+                lambda text, s=step: drop_indented_block(text, f"      {s}"),
             )
         self.edit(
             ".github/workflows/ci.yml",
-            "the note about the test job",
+            "the note about the test step",
             lambda text: _replace(
                 text,
-                "      # `check-static`, not `check`: `check` is the static steps plus pytest, "
-                "and pytest is\n      # the `test` job below, in the environment that owns it.\n",
+                "      # `check-static` and `test` as two steps, not `check` as one: pixi skips a "
+                "task whose\n      # dependency failed, and a step of its own runs regardless.\n",
                 "      # `check-static` and `check` are the same thing here: this repo has no "
                 "tests.\n",
             ),
@@ -991,7 +993,10 @@ class Init:
             "AGENTS.md",
             "src and tests in the layout",
             lambda text: drop_lines(
-                text, lambda line: line.startswith((f"src/{PLACEHOLDER_MODULE}/", "tests/  "))
+                text,
+                lambda line: line.startswith(
+                    (f"src/{PLACEHOLDER_MODULE}/", "tests/  ", "conftest.py  ")
+                ),
             ),
         )
         self.edit(
@@ -1270,7 +1275,7 @@ def next_steps(identity: Identity, tag: str | None, *, pushed: bool) -> list[str
             "environment `pypi`. There is no API token in this repo, and there must never be one."
         )
         steps.append("Publish a GitHub Release to release. Pushing a tag does not publish.")
-    checks = SHAPE_CHECKS[identity.shape]
+    checks = REQUIRED_CHECKS
     steps.append(
         "Clone the lab's labels — a template copies none, so `--label ready-for-agent` fails "
         "until you do:\n"

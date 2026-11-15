@@ -7,7 +7,7 @@ checked by no rule at all, with zero alerts and green CI. So the claim these tes
 
 Every test builds a tmp_path tree that is correct in every respect but one, and asserts the run
 marks THAT rule FAIL and names the offending file. The rule name alone would prove nothing: the
-status table prints all fifteen names on every run, passing or failing, so the assertions read the
+status table prints all sixteen names on every run, passing or failing, so the assertions read the
 status word out of the table rather than grepping the output for a name.
 
 The exit status is checked here too, all three of it: 0, 1 when a rule failed, and 2 when the
@@ -109,6 +109,10 @@ nav:
 # convention. Rule 8 wants a CHANGELOG.md wherever this file is, so `publishes` writes both.
 RELEASE_YML = ".github/workflows/release.yml"
 
+# What rule 14 looks for, spelled in pieces so this file does not plant it in the tree it checks.
+TIMEOUT_ENV = "PYTEST_" + "TIMEOUT"
+TIMEOUT_MARK = "pytest.mark." + "timeout"
+
 # Where rule 6 finds the names the `lab` plugin ships: Claude Code's clone of the marketplace,
 # under the home directory. Spelled out for the reason the release path is. Every run here gets
 # a home of its own beside the tree, so no test reads the real one.
@@ -194,7 +198,7 @@ def repo(tmp_path: Path) -> Path:
 
     It has no `src/`, no workflow at all and so no release workflow, so rule 8's two conditionals,
     rule 9 and rule 11 are all vacuous here; the tests that care add the premise, through
-    `publishes` and `runs`. It has no `skills/init-repo/`, so rule 1 and warning 14 are both live
+    `publishes` and `runs`. It has no `skills/init-repo/`, so rule 1 and warning 15 are both live
     — the state a derived repo is in, and the only state where they check anything. Its home
     has the `lab` plugin installed, so rule 6 is live too, as on a lab member's machine.
     """
@@ -258,7 +262,7 @@ def statuses(proc: subprocess.CompletedProcess[str]) -> dict[str, str]:
     """The verdict the run gave each rule, read off its own status table.
 
     Asserting on the status word rather than on the presence of a rule NAME is the point: the
-    table prints all fifteen names on every run, so `"repo-shape" in output` is true of a green run
+    table prints all sixteen names on every run, so `"repo-shape" in output` is true of a green run
     and would prove nothing at all.
     """
     found: dict[str, str] = {}
@@ -292,6 +296,7 @@ def test_the_fixture_tree_passes_every_rule(repo: Path) -> None:
         "python-version-agreement",
         "workflow-step-tasks",
         "nav-target-exists",
+        "test-time-limits",
         "init-sentinel",
         "waivers",
     }
@@ -324,14 +329,14 @@ def test_a_tree_that_has_skills_passes_every_rule(repo: Path) -> None:
 def test_it_exits_0_when_it_ran_and_every_rule_passed(repo: Path) -> None:
     proc = conformance(repo)
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert "All 13 rules pass." in proc.stdout
+    assert "All 14 rules pass." in proc.stdout
 
 
 def test_it_exits_1_when_it_ran_and_a_rule_failed(repo: Path) -> None:
     write(repo, "README.md", f"# liulab-{PLACEHOLDER}\n\nA repo that was never renamed.\n")
     proc = conformance(repo)
     assert proc.returncode == 1
-    assert "1 of 13 rules failed" in proc.stderr
+    assert "1 of 14 rules failed" in proc.stderr
 
 
 def test_it_exits_2_when_there_is_no_git_to_list_tracked_files_from(tmp_path: Path) -> None:
@@ -386,7 +391,7 @@ def test_rule_1_fires_on_a_placeholder_in_a_path_not_only_in_a_file(repo: Path) 
 
 def test_rule_1_is_not_checked_while_the_init_skill_is_there(repo: Path) -> None:
     # The template ships the placeholder ON PURPOSE, and `skills/init-repo/` is what says the
-    # rename has not happened yet. Same discriminator warning 14 uses.
+    # rename has not happened yet. Same discriminator warning 15 uses.
     write(repo, "README.md", f"# liulab-{PLACEHOLDER}\n\nStill the template.\n")
     add_skill(repo, "init-repo")
     proc = conformance(repo)
@@ -847,7 +852,7 @@ def test_rule_9_says_it_reads_one_path_and_the_rename_that_leaves_it(repo: Path)
     assert "a publishing workflow under any other name is outside it" in flat(proc.stdout)
 
 
-def test_warning_14_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> None:
+def test_warning_15_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> None:
     write(
         repo,
         "AGENTS.md",
@@ -859,7 +864,7 @@ def test_warning_14_warns_about_the_sentinel_and_does_not_fail(repo: Path) -> No
     assert "AGENTS.md still carries the `/init` sentinel" in flat(proc.stdout)
 
 
-def test_warning_14_is_silent_while_the_init_skill_is_the_nag(repo: Path) -> None:
+def test_warning_15_is_silent_while_the_init_skill_is_the_nag(repo: Path) -> None:
     write(
         repo,
         "AGENTS.md",
@@ -880,7 +885,7 @@ def test_a_waiver_suppresses_its_rule_and_is_still_printed(repo: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert statuses(proc)["glossary-format"] == "waived"
     assert f"1 problem(s) suppressed: {reason}" in flat(proc.stdout)
-    # and warning 15 prints it a second time, in the waiver table
+    # and warning 16 prints it a second time, in the waiver table
     assert f"glossary-format: 1 problem(s) suppressed — {reason}" in flat(proc.stdout)
 
 
@@ -913,7 +918,7 @@ def test_every_failure_is_reported_and_not_just_the_first(repo: Path) -> None:
     assert verdicts["agent-docs-unpublished"] == "FAIL"
     assert verdicts["skill-file-location"] == "FAIL"
     assert verdicts["repo-shape"] == "FAIL"
-    assert "3 of 13 rules failed" in proc.stderr
+    assert "3 of 14 rules failed" in proc.stderr
 
 
 @pytest.mark.parametrize(
@@ -1601,3 +1606,51 @@ def test_rule_13_reads_a_site_config_that_will_not_parse_as_empty(repo: Path) ->
     assert "Traceback" not in proc.stderr
     assert statuses(proc)["nav-target-exists"] == "ok"
     assert "not checked: mkdocs.broken.yml declares no `nav:`" in flat(proc.stdout)
+
+
+def test_rule_14_fires_on_a_timeout_set_in_a_workflow(repo: Path) -> None:
+    write(
+        repo,
+        ".github/workflows/ci.yml",
+        "name: ci\non:\n  pull_request:\njobs:\n  check:\n    runs-on: ubuntu-latest\n"
+        f"    env:\n      {TIMEOUT_ENV}: 60\n    steps:\n      - run: pixi run test\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["test-time-limits"] == "FAIL"
+    assert f".github/workflows/ci.yml sets `{TIMEOUT_ENV}`" in proc.stderr
+
+
+def test_rule_14_fires_on_a_pytest_task_and_not_on_another_tools_timeout(repo: Path) -> None:
+    # `wget --timeout` in a download task is not a test time limit, and failing it would be
+    # advice to break working code.
+    tasks = 'test-ci = "pytest --timeout=60"\nfetch = "wget --timeout=10 https://example.org"\n'
+    write(
+        repo, "pyproject.toml", PYPROJECT.replace('test = "pytest"\n', f'test = "pytest"\n{tasks}')
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["test-time-limits"] == "FAIL"
+    assert "pixi task `test-ci` passes `--timeout`" in proc.stderr
+    assert "`fetch`" not in proc.stderr
+
+
+def test_rule_14_fires_on_a_timeout_mark_in_a_test(repo: Path) -> None:
+    write(
+        repo,
+        "tests/test_example.py",
+        f"import pytest\n\n\n@{TIMEOUT_MARK}(60)\ndef test_x():\n    pass\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["test-time-limits"] == "FAIL"
+    assert f"tests/test_example.py:4 sets `{TIMEOUT_MARK}`" in proc.stderr
+
+
+def test_rule_14_passes_a_repo_that_keeps_both_limits_in_the_manifest(repo: Path) -> None:
+    runs(repo, "pixi run test")
+    write(repo, "tests/test_example.py", "def test_x():\n    pass\n")
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["test-time-limits"] == "ok"
+    assert "1 workflow(s), 1 pytest task(s) and 1 test file(s)" in flat(proc.stdout)

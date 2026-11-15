@@ -9,6 +9,13 @@ sets one.
 
 ### Added
 
+- Limits on test time. One test may take 2 s (`timeout`, read by pytest-timeout) and the whole
+  run 45 s (`suite_budget`, read by a small plugin in `conftest.py`, which prints the run's
+  time against it every time). A test marked `slow` is held to neither: the default run leaves
+  it out, and `pixi run test-slow` runs it. pytest-timeout's own session timeout was not used,
+  because it stops the run part-way and cannot leave the slow lane out. A conformance rule keeps
+  both limits in `[tool.pytest.ini_options]`: it fails a `PYTEST_TIMEOUT` or a `--timeout` in a
+  workflow or in a task that runs pytest, and a timeout mark on a test.
 - The placeholder package, the pixi workspace, and the three environments.
 - `scripts/check.sh`, the gate runner behind `pixi run check`: it runs every static step
   concurrently and reports all failures, not just the first. A step that passes is shown
@@ -66,6 +73,10 @@ sets one.
 
 ### Changed
 
+- CI is one job, run on pull requests and by hand, and no longer on a push to `main`. GitHub
+  bills each job rounded up to a whole minute, so five short jobs billed far more than one. Each
+  step after the first runs even when an earlier one failed, so a run still reports every
+  failure, and a new repo's branch ruleset requires that one `check`.
 - A new repo no longer ships the template's tests of its own settings,
   `tests/test_conformance.py` and `tests/test_quoted_evidence.py`. They tested the template,
   not the new repo, and they made every test run there slower. The template keeps both and
