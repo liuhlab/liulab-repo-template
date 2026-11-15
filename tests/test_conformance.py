@@ -564,18 +564,64 @@ def test_rule_4_fires_on_a_glossary_still_named_context_md(repo: Path) -> None:
     assert "git mv CONTEXT.md GLOSSARY.md" in proc.stderr
 
 
-def test_rule_4_fires_on_an_upstream_format_entry(repo: Path) -> None:
-    # The shape the upstream glossary skill writes: a `## Language` section of `**Term**:` lines.
-    # It has no `## Glossary` heading, so the entry cap alone would call this file empty.
+# The example in the `domain-modeling` skill's own GLOSSARY-FORMAT.md, as the skill writes it.
+SKILL_EXAMPLE_GLOSSARY = """\
+# {Context Name}
+
+{One or two sentence description of what this context is and why it exists.}
+
+## Language
+
+**Order**:
+{A one or two sentence description of the term}
+_Avoid_: Purchase, transaction
+
+**Invoice**:
+A request for payment sent to a customer after delivery.
+_Avoid_: Bill, payment request
+
+**Customer**:
+A person or organization that places orders.
+_Avoid_: Client, buyer, account
+"""
+
+
+def test_rule_4_measures_the_domain_modeling_skills_own_example(repo: Path) -> None:
+    # No `## Glossary` and no `###` entry, so a rule that read only the lab layout would call
+    # this file empty. Counted by hand: Invoice is the longest, term line included.
+    write(repo, "GLOSSARY.md", SKILL_EXAMPLE_GLOSSARY)
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["glossary-format"] == "ok"
+    assert "3 glossary entry(s), longest 15 of 200 words" in flat(proc.stdout)
+
+
+def test_rule_4_fires_on_an_overlong_entry_in_the_skills_layout(repo: Path) -> None:
+    body = " ".join(["word"] * 200)
+    write(repo, "GLOSSARY.md", f"# Ordering\n\n## Language\n\n**Order**:\n{body}\n")
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["glossary-format"] == "FAIL"
+    assert "GLOSSARY.md glossary entry `Order` is 201 words, over 200" in proc.stderr
+
+
+def test_rule_4_caps_each_skill_layout_entry_under_a_subheading(repo: Path) -> None:
+    # Grouped as the skill allows. Order and Invoice share a group and are 300 words together,
+    # so they pass only if each is its own entry; Customer, alone in the next group, is over.
+    fits, over = " ".join(["word"] * 149), " ".join(["word"] * 210)
     write(
         repo,
         "GLOSSARY.md",
-        "# Ordering\n\n## Language\n\n**Order**:\nA customer's request.\n_Avoid_: Purchase\n",
+        "# Ordering\n\n## Language\n\n### Orders\n\n"
+        f"**Order**:\n{fits}\n\n**Invoice**:\n{fits}\n\n"
+        f"### People\n\n**Customer**:\n{over}\n",
     )
     proc = conformance(repo)
     assert proc.returncode == 1
     assert statuses(proc)["glossary-format"] == "FAIL"
-    assert "GLOSSARY.md line 5 is an upstream-format entry, `**Order**:`" in proc.stderr
+    assert "glossary entry `Customer` is 211 words, over 200" in proc.stderr
+    assert "`Order`" not in proc.stderr
+    assert "`Invoice`" not in proc.stderr
 
 
 def test_rule_4_leaves_a_bold_lead_in_inside_an_entry_alone(repo: Path) -> None:
@@ -595,8 +641,9 @@ def test_rule_4_leaves_a_bold_lead_in_inside_an_entry_alone(repo: Path) -> None:
 def test_rule_4_is_not_checked_where_a_glossary_map_exists(repo: Path) -> None:
     # A map splits the glossary per context, in files this rule does not read. The root file
     # here would fail, which is what proves the rule stood down rather than passed.
+    body = " ".join(["word"] * 250)
     write(repo, "GLOSSARY-MAP.md", "# Glossary Map\n\n## Contexts\n\n- [Ordering](./src/o.md)\n")
-    write(repo, "GLOSSARY.md", "# Ordering\n\n## Language\n\n**Order**:\nA request.\n")
+    write(repo, "GLOSSARY.md", f"# Ordering\n\n## Language\n\n**Order**:\n{body}\n")
     proc = conformance(repo)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert statuses(proc)["glossary-format"] == "--"
@@ -1069,8 +1116,8 @@ def test_rule_12_fires_on_a_step_that_runs_a_bare_command(repo: Path) -> None:
 
 
 def test_rule_12_passes_a_step_that_invokes_a_declared_task(repo: Path) -> None:
-    # Two spellings, because the template writes both: a plain task, and one reached through an
-    # environment flag. A rule that read `pixi run <word>` and stopped would fail the second.
+    # Two spellings: a plain task, and one reached through an environment flag. A rule that
+    # read `pixi run <word>` and stopped would fail the second.
     runs(repo, "pixi run build", "pixi run -e test test")
     proc = conformance(repo)
     assert proc.returncode == 0, proc.stdout + proc.stderr
@@ -1187,7 +1234,7 @@ def test_rule_11_says_it_cannot_tell_a_range_from_a_floor_nobody_lowered(repo: P
 
 
 def test_rule_12_reads_past_the_environment_flag_to_the_task(repo: Path) -> None:
-    # `test` is BOTH an environment and a declared task here, which is the trap: a rule that
+    # `test` is a declared task, written where the environment goes, which is the trap: a rule that
     # accepted any declared name among the tokens would call this green and let the inlined
     # `pytest` through — the exact drift the rule exists to catch, hidden behind a `-e`.
     runs(repo, "pixi run -e test pytest")

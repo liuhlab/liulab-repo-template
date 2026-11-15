@@ -187,6 +187,11 @@ CLI_DEPENDENCY = "typer"
 CLI_PROJECT_DEPENDENCY = f'dependencies = ["{CLI_DEPENDENCY}>=0.12"]'
 CLI_PIXI_DEPENDENCY = f'{CLI_DEPENDENCY} = ">=0.12"'
 
+#: The API reference's renderer, on the docs feature. A repo with no package has no API to render,
+#: so it goes from the manifest and the lock with the plugin `mkdocs.yml` loses. Anchored on the
+#: key and not the version, so a version bump cannot turn the edit into a miss.
+API_DOCS_DEPENDENCY = "mkdocstrings-python"
+
 #: The licence's copyright line. The pattern matches whatever year the template shipped, and the
 #: rendered repo gets the year this ran — a year written once is a fact that goes stale and
 #: nothing rechecks it. The text itself is the MIT licence every other lab repo carries.
@@ -264,6 +269,18 @@ def drop_comment_block(text: str, prefix: str) -> str | None:
         start -= 1
     end = start
     while end < len(lines) and lines[end].lstrip().startswith("#"):
+        end += 1
+    return _cut(lines, start, end)
+
+
+def drop_list(text: str, prefix: str) -> str | None:
+    """Remove a lead-in line and the Markdown list directly under it."""
+    lines = _lines(text)
+    start = _find(lines, lambda line: line.startswith(prefix))
+    if start is None:
+        return None
+    end = start + 1
+    while end < len(lines) and (not lines[end].strip() or lines[end].startswith(("- ", "  "))):
         end += 1
     return _cut(lines, start, end)
 
@@ -934,18 +951,15 @@ class Init:
         self.edit(
             "pyproject.toml",
             "the test and build tasks",
-            # Matched WHOLE, not by prefix: `[tool.pixi.environments]` also has a line starting
-            # `test = `, and dropping that one takes the environment out of the manifest while
-            # the lock file keeps it, which fails `pixi install --locked` on its own.
+            # Matched WHOLE, not by prefix: a task line this repo has rewritten is its own to keep.
             lambda text: drop_lines(text, lambda line: line.rstrip() in TASKS_A_PACKAGE_NEEDS),
         )
         self.edit(
             "pyproject.toml",
             "pytest in the check task",
-            lambda text: _replace(
-                text,
-                'check = { depends-on = ["check-static", "test"] }',
-                'check = { depends-on = ["check-static"] }',
+            # The comment above the task goes with it: it is about `test`.
+            lambda text: _sub(
+                text, r"(?m)^(?:#.*\n)*check = .*\n", 'check = { depends-on = ["check-static"] }\n'
             ),
         )
         self.edit(
@@ -989,8 +1003,8 @@ class Init:
             "the note about the test step",
             lambda text: _replace(
                 text,
-                "      # `check-static` and `test` as two steps, not `check` as one: pixi skips a "
-                "task whose\n      # dependency failed, and a step of its own runs regardless.\n",
+                "      # `check-static` and `test` as two steps, not `check` as one, so each has "
+                "its own\n      # verdict on the run page.\n",
                 "      # `check-static` and `check` are the same thing here: this repo has no "
                 "tests.\n",
             ),
@@ -1006,6 +1020,18 @@ class Init:
             lambda text: drop_indented_block(text, "  - mkdocstrings:"),
         )
         self.edit(
+            "pyproject.toml",
+            f"{API_DOCS_DEPENDENCY} in the docs feature",
+            lambda text: drop_lines(
+                text, lambda line: line.startswith(f"{API_DOCS_DEPENDENCY} = ")
+            ),
+        )
+        self.edit(
+            "pixi.lock",
+            f"{API_DOCS_DEPENDENCY} and the packages that came with it",
+            lambda text: drop_lock_dependency(text, API_DOCS_DEPENDENCY),
+        )
+        self.edit(
             "AGENTS.md",
             "the package names",
             lambda text: _replace(
@@ -1019,6 +1045,23 @@ class Init:
             "AGENTS.md",
             "the test time limits",
             lambda text: _replace(text, AGENTS_TIME_LIMITS, ""),
+        )
+        self.edit(
+            "AGENTS.md",
+            "pytest in the check sentence",
+            lambda text: _replace(
+                text, "It is `check-static` plus `test`:", "It is `check-static`:"
+            ),
+        )
+        self.edit(
+            "AGENTS.md",
+            "the test row in the gates table",
+            lambda text: drop_lines(text, lambda line: line.rstrip() == "| `test` | pytest |"),
+        )
+        self.edit(
+            "AGENTS.md",
+            "the pytest and typer traps",
+            lambda text: drop_list(text, "Four traps in the gate:"),
         )
         self.edit(
             "AGENTS.md",

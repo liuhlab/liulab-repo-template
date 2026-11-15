@@ -65,9 +65,6 @@ pyyaml = "*"
 [tool.pixi.feature.test.dependencies]
 pytest = "*"
 pytest-timeout = "*"
-# Declared here too, not inherited: the tests run conformance, and a test environment shaped
-# differently from this one would import-error on every test.
-pyyaml = "*"
 
 # Exact: at 0.0.x nothing promises the next patch is compatible.
 [tool.pixi.feature.docs.dependencies]
@@ -88,7 +85,6 @@ docs-build = "zensical build -f mkdocs.template.yml --clean --strict"
 # never installs the site builder.
 [tool.pixi.environments]
 default = { features = ["test"], solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
 docs = { features = ["docs"], solve-group = "default" }
 
 [tool.pixi.tasks]
@@ -107,7 +103,10 @@ markdownlint = "markdownlint-cli2"
 conformance = "python scripts/conformance.py"
 # The static step list lives here and nowhere else; `check.sh` takes it as arguments.
 check-static = "bash scripts/check.sh lint fmt-check typecheck vale markdownlint conformance"
-check = { depends-on = ["check-static", "test"] }
+# `test` runs whatever `check-static` returned; `depends-on` would skip it. After it, not beside
+# it, so pytest's time limits and vale's walk of `tests/` never share the machine. pixi's task
+# shell has `$?` but no arithmetic.
+check = "pixi run check-static; static=$?; pixi run test && exit $static"
 # init-repo:begin dogfood
 # Markers read by `scripts/init_repo.py`, which deletes this block and its twin in ci.yml.
 # Template-only, and not a step of `check`: it installs three environments and takes minutes.
