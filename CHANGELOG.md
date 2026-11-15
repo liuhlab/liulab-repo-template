@@ -84,10 +84,9 @@ sets one.
   added for them.
 - The glossary is now `GLOSSARY.md`, the name the upstream skills read and write, and its
   conformance rule checks more. A repo whose glossary is still `CONTEXT.md`, or whose map is
-  still `CONTEXT-MAP.md`, fails, and the fix is one `git mv`. A `**Term**:` line fails too:
-  that is the upstream format, and only a `###` entry under `## Glossary` is measured. The
-  entry format and its 200-word cap are unchanged. Where a `GLOSSARY-MAP.md` splits the
-  glossary by context, the rule says it did not check it. It is now named `glossary-format`.
+  still `CONTEXT-MAP.md`, fails, and the fix is one `git mv`. The 200-word cap on each entry
+  is unchanged. Where a `GLOSSARY-MAP.md` splits the glossary by context, the rule says it did
+  not check it. It is now named `glossary-format`.
 - The conformance rule about skill names now fails a repo skill that takes any name the `lab`
   plugin ships, not only one that starts with `lab-`. The plugin now ships upstream skills
   under their own names, and in Kimi Code a repo skill of the same name replaces the
@@ -151,6 +150,12 @@ sets one.
 
 ### Fixed
 
+- The glossary rule now measures a glossary written the way the `domain-modeling` skill writes
+  it, and no longer fails it. A line that is only a bold term and a colon, `**Order**:`, starts
+  an entry under any `##` section, and the entry runs to the next such line or the next
+  heading. Each entry is held to the same 200-word cap as a `###` entry under `## Glossary`,
+  which is still measured as before. A glossary in the skill's layout used to fail on every
+  term line.
 - A new repo with no package no longer describes tests it does not have. `init-repo` now cuts
   the test step from the gate in `AGENTS.md`: the words "plus `test`", the `test` row, and the
   four traps, which are all about pytest or typer. It also drops `mkdocstrings-python` from the
