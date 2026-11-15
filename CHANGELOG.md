@@ -153,6 +153,9 @@ sets one.
 
 ### Fixed
 
+- The suite budget now stops its clock when the tests end. It used to also count pytest's
+  clean-up at the end of a run, which deletes the temp folders that earlier runs left behind.
+  On a laptop with many of those, a run could go over its budget although CI passed it.
 - A new repo's README now names the lab's plugin as it is published:
   `/plugin marketplace add liuhlab/liulab-skills`, then `/plugin install lab@liulab`. The
   template's own README does too.

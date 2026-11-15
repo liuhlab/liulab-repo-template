@@ -8,6 +8,7 @@ to neither, and the default run deselects it.
 from __future__ import annotations
 
 import time
+from collections.abc import Generator
 
 import pytest
 
@@ -20,6 +21,7 @@ class SuiteBudget:
     def __init__(self, budget: float) -> None:
         self.budget = budget
         self.started = time.perf_counter()
+        self.ended: float | None = None
         self.slow_ids: set[str] = set()
         self.slow_seconds = 0.0
         self.over = False
@@ -38,10 +40,19 @@ class SuiteBudget:
         if report.nodeid in self.slow_ids:
             self.slow_seconds += report.duration
 
+    @pytest.hookimpl(wrapper=True)
+    def pytest_runtestloop(self) -> Generator[None, object, object]:
+        """Stop the clock where the tests end, before any session-finish work."""
+        try:
+            return (yield)
+        finally:
+            self.ended = time.perf_counter()
+
     @pytest.hookimpl(trylast=True)
     def pytest_sessionfinish(self, session: pytest.Session) -> None:
         """Fail a run that took longer than its budget."""
-        took = time.perf_counter() - self.started - self.slow_seconds
+        ended = time.perf_counter() if self.ended is None else self.ended
+        took = ended - self.started - self.slow_seconds
         excluded = (
             f" ({self.slow_seconds:.1f} s of slow tests not counted)" if self.slow_seconds else ""
         )

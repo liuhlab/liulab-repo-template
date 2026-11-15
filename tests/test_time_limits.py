@@ -73,6 +73,16 @@ def test_a_suite_past_its_budget_fails_the_run(pytester: pytest.Pytester, where:
     result.stdout.fnmatch_lines(["suite time: * s, over its 0.1 s budget*"])
 
 
+def test_work_after_the_tests_is_not_counted(pytester: pytest.Pytester) -> None:
+    # Like pytest's own clean-up of old temp folders, which runs before the budget's verdict.
+    scratch(pytester, "def test_quick():\n    pass\n", timeout=1, budget=0.2)
+    finish = "import time\n\n\ndef pytest_sessionfinish():\n    time.sleep(0.3)\n"
+    (pytester.path / "tests" / "conftest.py").write_text(finish, encoding="utf-8")
+    result = pytester.runpytest()
+    assert result.ret == pytest.ExitCode.OK
+    result.stdout.fnmatch_lines(["suite time: * s of its 0.2 s budget"])
+
+
 @pytest.mark.parametrize("phase", ["setup", "call", "teardown"])
 def test_a_test_past_the_timeout_fails_in_any_phase(pytester: pytest.Pytester, phase: str) -> None:
     tests = f"""
