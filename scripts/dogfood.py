@@ -90,6 +90,9 @@ TEMPLATE_ARTIFACTS = (
 LABEL_COMMAND = "gh label clone liuhlab/liulab-repo-template --force --repo"
 REQUIRED_CHECKS = ["check"]
 
+#: An issue cited by number. A derived repo's numbers are its own, so any it ships came from here.
+ISSUE_CITATION = re.compile(rb"\(#\d+\)")
+
 #: The `PIXI_*` variables a parent `pixi run` exports. They name the TEMPLATE's manifest, and a
 #: nested pixi that inherited them would check this repo instead of the rendered one.
 PIXI_VARS = tuple(name for name in os.environ if name.startswith("PIXI_"))
@@ -259,6 +262,16 @@ def check_template_artifacts(stage: Path) -> list[str]:
     return problems
 
 
+def check_issue_citations(stage: Path) -> list[str]:
+    """Grep a rendered repo for `(#NN)`: its tracker starts empty, so the number is the template's."""
+    return [
+        f"{rel} cites {match.decode()}, an issue in the template's tracker"
+        for rel in tracked_paths(stage)
+        if not (stage / rel).is_symlink() and (stage / rel).is_file()
+        for match in ISSUE_CITATION.findall((stage / rel).read_bytes())
+    ]
+
+
 def check_changelog(stage: Path) -> list[str]:
     """Read the rendered changelog: it keeps its preamble and none of the template's entries.
 
@@ -377,6 +390,7 @@ def render(rung: Rung, parent: Path) -> None:
         + check_shape(rung, stage)
         + check_declined_cli(rung, stage)
         + check_template_artifacts(stage)
+        + check_issue_citations(stage)
         + check_changelog(stage)
         + check_next_steps(rung, checklist)
     )

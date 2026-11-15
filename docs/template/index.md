@@ -17,7 +17,7 @@ stays.
 | A working package | A small Python package with a command, tests that pass, and an API page built from its docstrings. |
 | One gate | `pixi run check` runs ruff, pyright, vale, markdownlint, a conformance check and pytest. It runs every step and prints all the failures at once. |
 | Writing rules | Vale checks them: word caps on the notes written for agents, plain language on the pages written for people. |
-| A docs site | This one. Built by zensical, published to GitHub Pages by a workflow. |
+| A docs site | This one. Built by zensical, and published to GitHub Pages by a workflow when the repo is public. |
 | Skills for agents | Tracked links in `.claude/skills/` and `.agents/skills/` point at `skills/`, so an agent finds them the moment you clone. You install nothing. |
 | Notes for agents | `AGENTS.md`, `GLOSSARY.md` and `docs/agents/` are written for a machine that has to act. They stay out of this menu and out of the search box. |
 

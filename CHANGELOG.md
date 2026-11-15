@@ -153,6 +153,13 @@ sets one.
 
 ### Fixed
 
+- A new repo's README now names the lab's plugin as it is published:
+  `/plugin marketplace add liuhlab/liulab-skills`, then `/plugin install lab@liulab`. The
+  template's own README does too.
+- No comment a new repo keeps cites an issue number from this template's tracker. Each says
+  its reason in words, and the dogfood render now fails on a `(#NN)` in any file it keeps.
+- `docs.yml` skips the deploy in a private repo, where a free plan cannot serve GitHub Pages. The
+  closing checklist and the new README say the site is for a public repo.
 - `pixi run check` now runs the tests when a static step fails, and exits non-zero if either
   failed. It used to stop at the first failing task, so one lint error hid every failing test.
   A repo made earlier with tests can copy the `check` line from this one.
