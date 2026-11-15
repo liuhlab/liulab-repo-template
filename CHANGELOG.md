@@ -73,6 +73,9 @@ sets one.
 
 ### Changed
 
+- CI skips a draft pull request and runs when it is marked ready, so a pull request opened as
+  a draft and readied once the local gate passes runs CI once. Pushes to a ready pull request
+  still run it, and so does a run started by hand.
 - CI is one job, run on pull requests and by hand, and no longer on a push to `main`. GitHub
   bills each job rounded up to a whole minute, so five short jobs billed far more than one. Each
   step after the first runs even when an earlier one failed, so a run still reports every
