@@ -1282,7 +1282,7 @@ def test_rule_12_does_not_flag_a_step_that_uses_an_action(repo: Path) -> None:
         "    runs-on: ubuntu-latest\n"
         "    steps:\n"
         "      - uses: actions/checkout@v7\n"
-        "      - uses: prefix-dev/setup-pixi@v0.10.2\n"
+        "      - uses: prefix-dev/setup-pixi@v0.11.3\n"
         "        with:\n"
         "          environments: default\n"
         "      - run: pixi run build\n"
