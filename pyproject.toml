@@ -64,6 +64,7 @@ pyyaml = "*"
 
 [tool.pixi.feature.test.dependencies]
 pytest = "*"
+pytest-timeout = "*"
 # Declared here too, not inherited: the tests run conformance, and a test environment shaped
 # differently from this one would import-error on every test.
 pyyaml = "*"
@@ -83,8 +84,8 @@ mkdocstrings-python = ">=2.0.7,<3"
 docs = "zensical serve -f mkdocs.template.yml"
 docs-build = "zensical build -f mkdocs.template.yml --clean --strict"
 
-# `default` takes `test` so pyright can resolve pytest, and not `docs`, which exists so that
-# exactly one CI job installs it.
+# `default` takes `test` so pyright can resolve pytest, and not `docs`, so `pixi run check`
+# never installs the site builder.
 [tool.pixi.environments]
 default = { features = ["test"], solve-group = "default" }
 test = { features = ["test"], solve-group = "default" }
@@ -96,6 +97,7 @@ fmt = "ruff format ."
 fmt-check = "ruff format --check ."
 typecheck = "pyright"
 test = "pytest"
+test-slow = "pytest -m slow"
 build = "python -m build"
 # `.`, never an absolute path: an absolute path matches no `.vale.ini` section and exits 0.
 # The globs stop vale walking trees it never lints — check.sh runs steps concurrently, and a
@@ -156,7 +158,7 @@ convention = "numpy"
 
 [tool.pyright]
 # `scripts` and `skills` included: CI and conformance execute those files.
-include = ["src", "tests", "scripts", "skills"]
+include = ["src", "tests", "scripts", "skills", "conftest.py"]
 exclude = ["**/__pycache__", "**/.pixi"]
 venvPath = ".pixi/envs"
 venv = "default"
@@ -193,9 +195,16 @@ addopts = [
     "--strict-config",
     "--doctest-modules",
     "--continue-on-collection-errors",
+    "-m",
+    "not slow",
 ]
 xfail_strict = true
 filterwarnings = ["error"]
+# The two time limits, here and nowhere else: conformance fails a copy in a workflow, a task or
+# a test. `conftest.py` reads `suite_budget`; pytest-timeout reads `timeout`, which covers a
+# test's setup, call and teardown. A test marked `slow` is held to neither.
+timeout = 2
+suite_budget = 45
 
 # ============================== liulab ==============================
 # Read by `scripts/conformance.py`; its docstring has the rules.

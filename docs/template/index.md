@@ -49,7 +49,7 @@ default answer is keep. `--plan` shows you the whole survey and changes nothing.
 A new repo should not inherit the machinery that made it. So the script deletes:
 
 - both agent skills — `init-repo` and `template-dev` — and their tracked links
-- `scripts/init_repo.py`, `scripts/dogfood.py`, and the CI job that renders this template
+- `scripts/init_repo.py`, `scripts/dogfood.py`, and the CI step that renders this template
 - this page, and the config file that names the site after the template
 - the template's own decision record and research notes, plus every sentence in a surviving
   file that pointed at one of them

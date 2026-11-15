@@ -4,7 +4,7 @@
     pixi run dogfood
     python scripts/dogfood.py --rung no-package --keep
 
-TEMPLATE-ONLY. `scripts/init_repo.py` deletes this file, and the `dogfood` job in `ci.yml`
+TEMPLATE-ONLY. `scripts/init_repo.py` deletes this file, and the `dogfood` step in `ci.yml`
 goes with it, because a derived repo has nothing to render.
 
 The only seam that sees `init-repo` at all, since everything that skill does happens to a
@@ -83,16 +83,12 @@ TEMPLATE_ARTIFACTS = (
     "tests/test_quoted_evidence.py",
 )
 
-#: The two repo-settings commands `init-repo`'s closing checklist hands over, and the `ci.yml`
-#: jobs each shape keeps. Spelled out here rather than imported from `scripts/init_repo.py`, for
+#: The two repo-settings commands `init-repo`'s closing checklist hands over, and the one `ci.yml`
+#: job every shape keeps. Spelled out here rather than imported from `scripts/init_repo.py`, for
 #: the reason the constants above are: a check that reads its expectation out of the thing it is
-#: checking cannot tell a shape-correct list from one that drifted off the shapes.
+#: checking cannot tell a correct list from one that drifted.
 LABEL_COMMAND = "gh label clone liuhlab/liulab-repo-template --force --repo"
-SHAPE_CHECKS = {
-    "published": ["check", "test", "build", "docs"],
-    "not-published": ["check", "test", "build", "docs"],
-    "no-package": ["check", "docs"],
-}
+REQUIRED_CHECKS = ["check"]
 
 #: The `PIXI_*` variables a parent `pixi run` exports. They name the TEMPLATE's manifest, and a
 #: nested pixi that inherited them would check this repo instead of the rendered one.
@@ -285,8 +281,8 @@ def check_next_steps(rung: Rung, output: str) -> list[str]:
     Neither one is in the tree, so no other check here can see them — the labels and the ruleset
     are GitHub state, and the checklist is the part of that this repo owns. The required checks
     are read back out of the command rather than matched as one literal string, because what
-    can drift is the LIST: `no-package` deletes the `test` and `build` jobs, and a ruleset
-    naming a job that never reports makes every pull request in that repo unmergeable.
+    can drift is the LIST: a ruleset naming a job that never reports makes every pull request
+    in that repo unmergeable.
     """
     problems: list[str] = []
     slug = f"liuhlab/{rung.repo}"
@@ -295,10 +291,10 @@ def check_next_steps(rung: Rung, output: str) -> list[str]:
     if f"repos/{slug}/rulesets" not in output:
         problems.append(f"the checklist does not hand over a ruleset command for {slug}")
     contexts = re.findall(r'"context":\s*"([^"]+)"', output)
-    if contexts != SHAPE_CHECKS[rung.shape]:
+    if contexts != REQUIRED_CHECKS:
         problems.append(
             f"the ruleset command requires {contexts or 'nothing'}, "
-            f"and this shape has {SHAPE_CHECKS[rung.shape]}"
+            f"and ci.yml has {REQUIRED_CHECKS}"
         )
     return problems
 
@@ -315,7 +311,7 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
         "skills/init-repo": False,
         "skills/template-dev": False,
         "skills/install.py": True,
-        # Template machinery deletes itself, including the two scripts behind this job.
+        # Template machinery deletes itself, including the two scripts behind this step.
         "scripts/init_repo.py": False,
         "scripts/dogfood.py": False,
         "scripts/conformance.py": True,
@@ -324,6 +320,7 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
         "src": packaged,
         "tests": packaged,
         "docs/api.md": packaged,
+        "conftest.py": packaged,
         # Never subtracted, at any rung. `check_changelog` asks the other half of that: the
         # file ships, and the entries under its heading are this repo's or nobody's. The
         # licence is asked the same two questions — it ships, and the year below is this
@@ -354,7 +351,7 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
         problems.append(f"LICENSE does not say {copyright_line!r}, the year this render ran")
     workflow = (stage / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     if "dogfood" in workflow:
-        problems.append("ci.yml still carries the dogfood job")
+        problems.append("ci.yml still carries the dogfood step")
     if packaged and not (stage / f"src/{rung.module}/__init__.py").is_file():
         problems.append(f"src/{rung.module}/ is not the renamed package")
     return problems
@@ -371,7 +368,7 @@ def render(rung: Rung, parent: Path) -> None:
     manifest = ["--manifest-path", str(stage / "pyproject.toml")]
     run(["pixi", "install", "--locked", *manifest], stage, label="pixi install --locked")
     run(["pixi", "run", "--locked", *manifest, "check"], stage, label="pixi run check")
-    # The docs build is a job of its own in the rendered repo, and it is the only thing that
+    # The docs build is a CI step of its own in the rendered repo, and the only thing that
     # reads `mkdocs.yml` and `docs/api.md` — both of which `init-repo` edits. `--strict` is in
     # the task, so a reference to a module this rung deleted fails here.
     run(["pixi", "run", "--locked", *manifest, "docs-build"], stage, label="pixi run docs-build")

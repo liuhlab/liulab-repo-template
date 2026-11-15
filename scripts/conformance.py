@@ -5,7 +5,7 @@
     python scripts/conformance.py [--root PATH]
 
 It states the RULE, not the file contents — a pull model, so a repo that legitimately diverges
-stays green while the shared conventions stay checked. Fifteen rules: thirteen fail, two only warn.
+stays green while the shared conventions stay checked. Sixteen rules: fourteen fail, two only warn.
 
 Three exit statuses, spelled the way `scripts/check.sh` spells its own: **0** every rule passed,
 **1** it ran and a rule failed, **2** it could not run at all — no `.git` to list tracked files
@@ -49,7 +49,7 @@ import subprocess
 import sys
 import textwrap
 import tomllib
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path, PurePosixPath
@@ -75,13 +75,13 @@ class CannotRunError(Exception):
 
 
 #: The template's placeholder module name, SPELLED IN TWO PIECES on purpose. `init-repo`
-#: substitutes that name throughout the tree and the dogfood job then greps a rendered repo for
+#: substitutes that name throughout the tree and the dogfood step then greps a rendered repo for
 #: it. A literal here would be rewritten — turning rule 1 into a check for the new module's own
 #: name, which is everywhere — and would leave a copy for that grep to find. Two pieces, and
 #: neither happens.
 PLACEHOLDER = "new" + "pkg"
 
-#: Rule 1 and warning 14 are both gated on this directory, and it is the only discriminator either
+#: Rule 1 and warning 15 are both gated on this directory, and it is the only discriminator either
 #: needs. While it is here, `init-repo` has not run: the placeholder is still the repo's own name,
 #: and the auto-discovered skill is itself the nag. Once it is gone the repo claims to be its own,
 #: and both rules start checking.
@@ -194,6 +194,18 @@ SHELL_OPERATORS = frozenset({"&&", "||", "|", ";", "&"})
 #: its task with an expression is reported as unresolved rather than failed.
 EXPRESSION = "${{}}"
 _EXPRESSION_RE = re.compile(r"\$\{\{.*?\}\}", re.DOTALL)
+
+#: Rule 14's three other places to set a test time limit: pytest-timeout's environment variable
+#: and its flag, and its mark. Whole tokens, so `--timeout-method` and `--session-timeout` pass.
+TIMEOUT_ENV = "PYTEST_TIMEOUT"
+TIMEOUT_FLAG = "--timeout"
+TIMEOUT_MARK = "pytest.mark.timeout"
+_TIMEOUT_ENV_RE = re.compile(r"\bPYTEST_TIMEOUT\b")
+_TIMEOUT_FLAG_RE = re.compile(r"(?<![\w-])--timeout(?![\w-])")
+_TIMEOUT_MARK_RE = re.compile(r"\bmark\.timeout\b")
+_PYTEST_RE = re.compile(r"\bpytest\b")
+#: A file pytest reads tests or fixtures from, by its default names.
+_TEST_FILE_RE = re.compile(r"(?:^|/)(?:test_[^/]*|[^/]*_test|conftest)\.py$")
 
 _SECTION_RE = re.compile(r"^\[(?P<header>.+)\]\s*$")
 _SETTING_RE = re.compile(r"^(?P<key>[A-Za-z][^=]*?)\s*=\s*(?P<value>.*?)\s*$")
@@ -350,12 +362,15 @@ class Workflow:
     steps
         Every step of every job, in file order, each carrying the job it came from. Flat because
         the rules that read steps ask about all of them, and a step knows its own job.
+    strings
+        Every key and string value in the file, at any depth. Comments are not among them.
     """
 
     path: str
     name: str
     triggers: dict[str, Any]
     steps: tuple[Step, ...]
+    strings: tuple[str, ...] = ()
 
 
 def _string(value: Any) -> str | None:
@@ -609,7 +624,12 @@ class Repo:
         lives on the `docs` feature — so a rule reading one table would fail the docs job of a
         workflow that is entirely correct.
         """
-        return frozenset(_task_names(self.manifest.get("tool", {}).get("pixi")))
+        return frozenset(name for name, _ in self.task_definitions)
+
+    @cached_property
+    def task_definitions(self) -> tuple[tuple[str, Any], ...]:
+        """Every pixi task as (name, definition), from every table `tasks` walks."""
+        return tuple(_tasks(self.manifest.get("tool", {}).get("pixi")))
 
     @cached_property
     def workflows(self) -> tuple[Workflow, ...]:
@@ -642,6 +662,7 @@ class Repo:
                     name=_string(document.get("name")) or PurePosixPath(rel).stem,
                     triggers=_triggers(document),
                     steps=_steps(rel, document),
+                    strings=tuple(_keys_and_strings(document)),
                 )
             )
         return tuple(found)
@@ -741,8 +762,8 @@ def _plugins(document: dict[str, Any]) -> set[str]:
     return {str(name).rsplit("/", 1)[-1] for name in names}
 
 
-def _task_names(node: Any) -> Iterator[str]:
-    """Every key of every `tasks` table at any depth, wherever pixi accepts one.
+def _tasks(node: Any) -> Iterator[tuple[str, Any]]:
+    """Every entry of every `tasks` table at any depth, wherever pixi accepts one.
 
     One walk rather than four reads: a task may be declared on the workspace, on a feature, on a
     platform target, or on a target under a feature.
@@ -751,9 +772,35 @@ def _task_names(node: Any) -> Iterator[str]:
         return
     for key, value in node.items():  # pyright: ignore[reportUnknownVariableType]
         if key == "tasks" and isinstance(value, dict):
-            yield from (str(name) for name in value)  # pyright: ignore[reportUnknownVariableType]
+            for name, definition in value.items():  # pyright: ignore[reportUnknownVariableType]
+                yield str(name), definition  # pyright: ignore[reportUnknownArgumentType]
         else:
-            yield from _task_names(value)
+            yield from _tasks(value)
+
+
+def _outside_tasks(node: Any) -> Iterator[str]:
+    """Every key and string under `[tool.pixi]` that is not inside a `tasks` table."""
+    if isinstance(node, dict):
+        for key, value in node.items():  # pyright: ignore[reportUnknownVariableType]
+            if key == "tasks" and isinstance(value, dict):
+                continue
+            yield str(key)  # pyright: ignore[reportUnknownArgumentType]
+            yield from _outside_tasks(value)
+    else:
+        yield from _keys_and_strings(node)
+
+
+def _keys_and_strings(node: Any) -> Iterator[str]:
+    """Every mapping key and every string value in a parsed document, at any depth."""
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, list):
+        for item in node:  # pyright: ignore[reportUnknownVariableType]
+            yield from _keys_and_strings(item)
+    elif isinstance(node, dict):
+        for key, value in node.items():  # pyright: ignore[reportUnknownVariableType]
+            yield str(key)  # pyright: ignore[reportUnknownArgumentType]
+            yield from _keys_and_strings(value)
 
 
 @dataclass(frozen=True)
@@ -969,7 +1016,7 @@ def _python_pins(pyproject: dict[str, Any]) -> dict[str, str]:
 
 
 # --------------------------------------------------------------------------------------
-# The rules. Thirteen fail, two warn. Each returns what it found; nothing here exits or prints.
+# The rules. Fourteen fail, two warn. Each returns what it found; nothing here exits or prints.
 # --------------------------------------------------------------------------------------
 
 
@@ -1771,8 +1818,72 @@ def rule_nav_target_exists(repo: Repo) -> Result:
     return result
 
 
+def _timeout_overrides(strings: Iterable[str]) -> list[str]:
+    """Which of `PYTEST_TIMEOUT` and `--timeout` these strings set, as a problem's verb phrase."""
+    joined = "\n".join(strings)
+    found: list[str] = []
+    if _TIMEOUT_ENV_RE.search(joined):
+        found.append(f"sets `{TIMEOUT_ENV}`")
+    if _TIMEOUT_FLAG_RE.search(joined):
+        found.append(f"passes `{TIMEOUT_FLAG}`")
+    return found
+
+
+def rule_test_time_limits(repo: Repo) -> Result:
+    """14. The test time limits are set in `[tool.pytest.ini_options]` and nowhere else.
+
+    Three other places can set pytest-timeout's limit, and each beats the ini value: an
+    environment variable or a flag in a workflow, the same in pixi's tasks or activation, and a
+    mark on a test.
+
+    `--timeout` is read in a task only when the task runs pytest, because the flag belongs to
+    other tools too and a download that waits for a server is not a test time limit. A workflow
+    step can only invoke a task (rule 12), so a `--timeout` there is read as one whichever task it
+    goes to. `PYTEST_TIMEOUT` is read everywhere: it reaches pytest through any task that runs it.
+    """
+    result = Result()
+    why = (
+        "`timeout` and `suite_budget` live in [tool.pytest.ini_options] so that raising one is "
+        "a one-line diff a reviewer sees. A copy here overrides it without touching that line, "
+        "and limits raised one unreviewed place at a time are how a suite gets slow unnoticed"
+    )
+    fix = (
+        "delete it. Mark a test that needs longer `slow`; change a limit that is wrong for the "
+        "whole suite in [tool.pytest.ini_options]"
+    )
+    for workflow in repo.workflows:
+        for found in _timeout_overrides(workflow.strings):
+            result.problems.append(_problem(f"{workflow.path} {found}", why, fix))
+    pytest_tasks = 0
+    for name, definition in repo.task_definitions:
+        strings = tuple(_keys_and_strings(definition))
+        runs_pytest = any(_PYTEST_RE.search(string) for string in strings)
+        pytest_tasks += runs_pytest
+        for found in _timeout_overrides(strings):
+            if runs_pytest or TIMEOUT_ENV in found:
+                result.problems.append(_problem(f"pixi task `{name}` {found}", why, fix))
+    pixi = repo.manifest.get("tool", {}).get("pixi")
+    if any(_TIMEOUT_ENV_RE.search(string) for string in _outside_tasks(pixi)):
+        result.problems.append(
+            _problem(f"[tool.pixi] sets `{TIMEOUT_ENV}` outside a task", why, fix)
+        )
+    tests = [rel for rel in repo.tracked if _TEST_FILE_RE.search(rel)]
+    for rel in tests:
+        for number, line in enumerate((repo.read(rel) or "").splitlines(), start=1):
+            if _TIMEOUT_MARK_RE.search(line):
+                result.problems.append(_problem(f"{rel}:{number} sets `{TIMEOUT_MARK}`", why, fix))
+    if not (repo.workflows or pytest_tasks or tests):
+        result.notes.append("not checked: no workflow, no task that runs pytest, and no test file")
+        return result
+    result.notes.append(
+        f"{len(repo.workflows)} workflow(s), {pytest_tasks} pytest task(s) and {len(tests)} test "
+        "file(s) read"
+    )
+    return result
+
+
 def warning_init_sentinel(repo: Repo) -> Result:
-    """14. `AGENTS.md` still carries the line telling you to run `/init`."""
+    """15. `AGENTS.md` still carries the line telling you to run `/init`."""
     result = Result()
     if repo.exists(INIT_SKILL):
         result.notes.append(f"not checked: {INIT_SKILL}/ is here, and that skill is the nag")
@@ -1912,6 +2023,15 @@ RULES: tuple[Rule, ...] = (
     ),
     Rule(
         14,
+        "test-time-limits",
+        f"the test time limits are `timeout` and `suite_budget` in [tool.pytest.ini_options], and "
+        f"nowhere else: no `{TIMEOUT_ENV}` in a workflow or anywhere under [tool.pixi], no "
+        f"`{TIMEOUT_FLAG}` in a workflow or in a pixi task that runs pytest, and no "
+        f"`{TIMEOUT_MARK}` in a test",
+        rule_test_time_limits,
+    ),
+    Rule(
+        15,
         "init-sentinel",
         "AGENTS.md is still the template's generic copy",
         warning_init_sentinel,
@@ -1919,9 +2039,9 @@ RULES: tuple[Rule, ...] = (
     ),
 )
 
-#: Warning 15 is not a rule with a tree to inspect: it is the waiver table itself, printed on
+#: Warning 16 is not a rule with a tree to inspect: it is the waiver table itself, printed on
 #: every run. It lives in `report` because only the reporter knows what each waiver suppressed.
-WAIVER_RULE = (15, "waivers")
+WAIVER_RULE = (16, "waivers")
 
 
 def load(root: Path) -> Repo:
@@ -1983,7 +2103,7 @@ def _verdict(repo: Repo, rule: Rule, result: Result) -> tuple[str, list[str]]:
 
 
 def _waiver_lines(repo: Repo, results: list[tuple[Rule, Result]]) -> list[str]:
-    """Warning 15: every waiver, with what it actually suppressed.
+    """Warning 16: every waiver, with what it actually suppressed.
 
     A waiver naming no rule is called out rather than ignored, and so is one naming rule 1, which
     refuses to be waived. A waiver that quietly does nothing is the same invisible escape hatch
