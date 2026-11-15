@@ -951,9 +951,7 @@ class Init:
         self.edit(
             "pyproject.toml",
             "the test and build tasks",
-            # Matched WHOLE, not by prefix: `[tool.pixi.environments]` also has a line starting
-            # `test = `, and dropping that one takes the environment out of the manifest while
-            # the lock file keeps it, which fails `pixi install --locked` on its own.
+            # Matched WHOLE, not by prefix: a task line this repo has rewritten is its own to keep.
             lambda text: drop_lines(text, lambda line: line.rstrip() in TASKS_A_PACKAGE_NEEDS),
         )
         self.edit(

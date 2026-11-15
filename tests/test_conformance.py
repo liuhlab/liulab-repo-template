@@ -1069,8 +1069,8 @@ def test_rule_12_fires_on_a_step_that_runs_a_bare_command(repo: Path) -> None:
 
 
 def test_rule_12_passes_a_step_that_invokes_a_declared_task(repo: Path) -> None:
-    # Two spellings, because the template writes both: a plain task, and one reached through an
-    # environment flag. A rule that read `pixi run <word>` and stopped would fail the second.
+    # Two spellings: a plain task, and one reached through an environment flag. A rule that
+    # read `pixi run <word>` and stopped would fail the second.
     runs(repo, "pixi run build", "pixi run -e test test")
     proc = conformance(repo)
     assert proc.returncode == 0, proc.stdout + proc.stderr
@@ -1187,7 +1187,7 @@ def test_rule_11_says_it_cannot_tell_a_range_from_a_floor_nobody_lowered(repo: P
 
 
 def test_rule_12_reads_past_the_environment_flag_to_the_task(repo: Path) -> None:
-    # `test` is BOTH an environment and a declared task here, which is the trap: a rule that
+    # `test` is a declared task, written where the environment goes, which is the trap: a rule that
     # accepted any declared name among the tokens would call this green and let the inlined
     # `pytest` through — the exact drift the rule exists to catch, hidden behind a `-e`.
     runs(repo, "pixi run -e test pytest")

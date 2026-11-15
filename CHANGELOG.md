@@ -140,6 +140,9 @@ sets one.
 
 ### Removed
 
+- The pixi `test` environment. It had the same packages as `default`, and only a separate CI
+  test job used it. CI is now one job that runs in `default`, so every new repo carried the
+  environment and its part of `pixi.lock` for nothing.
 - The pages on the issue tracker, the triage labels and the domain docs are gone from
   `docs/agents/`. A machine set up with `/lab-setup` gives every agent all three as lab
   defaults, so a new repo needs none of them. Write your own page only where your repo is

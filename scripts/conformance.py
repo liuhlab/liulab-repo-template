@@ -825,8 +825,9 @@ def _invoked_task(run: str) -> Invocation | None:
     """Read the pixi task one step's `run:` script invokes, or ``None`` when it runs a command.
 
     The accepted shape is `pixi run`, any pixi options, the task, and then — optionally — `--`
-    and arguments for it. Options are skipped on both sides of `run`, so `pixi run -e test test`
-    and `pixi run docs-build` arrive the same way and no spelling is privileged.
+    and arguments for it. Options are skipped on both sides of `run`, so
+    `pixi run -e docs docs-build` and `pixi run test` arrive the same way and no spelling is
+    privileged.
 
     Arguments are ACCEPTED and reported, not forbidden. A flag a workflow wants and a laptop does
     not — `--durations=10` on the CI run of the test suite — is ordinary, and forbidding it only
