@@ -167,7 +167,7 @@ AGENTS_TIME_LIMITS = (
     "Test time has two limits, set in `[tool.pytest.ini_options]` and nowhere else:\n"
     "\n"
     "- **`timeout`** caps one test, setup and teardown included.\n"
-    "- **`suite_budget`** caps the whole run; every run prints its time against it.\n"
+    "- **`suite_budget`** caps a run with no slow test in it, and prints its time against it.\n"
     "- **The slow lane:** a test marked `slow` is held to neither, and runs only in\n"
     "  `pixi run test-slow`.\n"
     "\n"

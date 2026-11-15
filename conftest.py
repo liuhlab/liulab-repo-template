@@ -95,7 +95,7 @@ def pytest_configure(config: pytest.Config) -> None:
 def pytest_runtest_makereport(
     item: pytest.Item,
 ) -> Generator[None, pytest.TestReport, pytest.TestReport]:
-    """Tag a `slow` test's report. The marker, unlike keywords, misses a directory named `slow`."""
+    """Tag a `slow` test's report."""
     report = yield
     if item.get_closest_marker(SLOW):
         report.user_properties.append(SLOW_TAG)
