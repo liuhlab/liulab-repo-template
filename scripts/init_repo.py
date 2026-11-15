@@ -957,10 +957,9 @@ class Init:
         self.edit(
             "pyproject.toml",
             "pytest in the check task",
-            lambda text: _replace(
-                text,
-                'check = { depends-on = ["check-static", "test"] }',
-                'check = { depends-on = ["check-static"] }',
+            # The comment above the task goes with it: it is about `test`.
+            lambda text: _sub(
+                text, r"(?m)^(?:#.*\n)*check = .*\n", 'check = { depends-on = ["check-static"] }\n'
             ),
         )
         self.edit(
@@ -1004,8 +1003,8 @@ class Init:
             "the note about the test step",
             lambda text: _replace(
                 text,
-                "      # `check-static` and `test` as two steps, not `check` as one: pixi skips a "
-                "task whose\n      # dependency failed, and a step of its own runs regardless.\n",
+                "      # `check-static` and `test` as two steps, not `check` as one, so each has "
+                "its own\n      # verdict on the run page.\n",
                 "      # `check-static` and `check` are the same thing here: this repo has no "
                 "tests.\n",
             ),

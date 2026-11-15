@@ -150,6 +150,9 @@ sets one.
 
 ### Fixed
 
+- `pixi run check` now runs the tests when a static step fails, and exits non-zero if either
+  failed. It used to stop at the first failing task, so one lint error hid every failing test.
+  A repo made earlier with tests can copy the `check` line from this one.
 - The glossary rule now measures a glossary written the way the `domain-modeling` skill writes
   it, and no longer fails it. A line that is only a bold term and a colon, `**Order**:`, starts
   an entry under any `##` section, and the entry runs to the next such line or the next
