@@ -97,10 +97,12 @@ GLOSSARY = "GLOSSARY.md"
 GLOSSARY_MAP = "GLOSSARY-MAP.md"
 GLOSSARY_RENAMES = (("CONTEXT.md", GLOSSARY), ("CONTEXT-MAP.md", GLOSSARY_MAP))
 
-#: An upstream-format glossary entry: a line that is a bold term and a colon and nothing else,
-#: the definition on the lines below. Whole-line on purpose. A lab entry may open a paragraph on
-#: a bold phrase and a colon and run on, and that is prose.
-_UPSTREAM_ENTRY_RE = re.compile(r"^\*\*(?P<term>[^*]+)\*\*:\s*$")
+#: A glossary entry as the `domain-modeling` skill writes it: a line that is a bold term and a
+#: colon and nothing else, the definition on the lines below. Whole-line on purpose. A paragraph
+#: may open on a bold phrase and a colon and run on, and that is prose.
+_TERM_LINE_RE = re.compile(r"^\*\*(?P<term>[^*]+)\*\*:\s*$")
+#: A Markdown heading, and its level.
+_HEADING_RE = re.compile(r"^(?P<level>#{1,6})\s")
 
 #: The site configuration every repo that publishes a site has, and where the site source sits
 #: when it does not say. Rules 2 and 13 are both scoped to the pages the site publishes, so they
@@ -914,32 +916,34 @@ def _vale_sections(text: str) -> list[tuple[str, dict[str, str]]]:
 
 
 def _glossary_entries(text: str) -> list[tuple[str, int]]:
-    """Each `###` entry under `## Glossary` in the glossary, with its word count.
+    """Each entry in the glossary, with its word count.
 
-    The cap is per ENTRY and not per file, so a repo with a large vocabulary is not punished for
-    the size of its domain. An entry runs from its own heading to the next heading at the same or
-    a higher level.
+    An entry is a `###` heading under `## Glossary`, or a `**Term**:` line under any `##` section.
+    The first runs to the next heading at its own level or higher, the second to the next heading
+    of any level; either ends at the next entry. The cap is per ENTRY and not per file, so a repo
+    with a large vocabulary is not punished for the size of its domain.
     """
     entries: list[tuple[str, int]] = []
-    in_glossary = False
+    section: str | None = None
     title: str | None = None
+    ends_below = 0
     words = 0
     for line in text.splitlines():
-        if line.startswith("## "):
-            if title is not None:
-                entries.append((title, words))
-                title = None
-            in_glossary = line[3:].strip().lower() == "glossary"
-            continue
-        if not in_glossary:
-            continue
-        if line.startswith("### "):
-            if title is not None:
-                entries.append((title, words))
-            title = line[4:].strip()
+        heading = _HEADING_RE.match(line)
+        term = _TERM_LINE_RE.match(line) if section is not None else None
+        level = len(heading["level"]) if heading else 0
+        if title is not None and (term or (heading and level < ends_below)):
+            entries.append((title, words))
+            title = None
+        if level == 2:
+            section = line[3:].strip().lower()
+        elif level == 3 and section == "glossary":
+            title, ends_below = line[4:].strip(), 4
             words = len(title.split())
-            continue
-        if title is not None:
+        elif term:
+            title, ends_below = str(term["term"]).strip(), 7
+            words = len(title.split())
+        elif title is not None:
             words += len(line.split())
     if title is not None:
         entries.append((title, words))
@@ -1210,23 +1214,13 @@ def rule_glossary_format(repo: Repo) -> Result:
         if not result.problems:
             result.notes.append(f"not checked: no {GLOSSARY}")
         return result
-    for number, line in enumerate(text.splitlines(), start=1):
-        upstream = _UPSTREAM_ENTRY_RE.match(line)
-        if upstream:
-            result.problems.append(
-                _problem(
-                    f"{GLOSSARY} line {number} is an upstream-format entry, `{line.strip()}`",
-                    "a lab glossary entry is a `###` heading under `## Glossary`, and only that "
-                    "shape is capped. A term line is one this rule cannot measure, so a glossary "
-                    "written this way would pass with every entry unchecked",
-                    f"make it `### {upstream['term'].strip()}` under `## Glossary`, with the "
-                    "definition below it",
-                )
-            )
     entries = _glossary_entries(text)
     if not entries:
         if not result.problems:
-            result.notes.append(f"not checked: {GLOSSARY} has no entries under `## Glossary`")
+            result.notes.append(
+                f"not checked: {GLOSSARY} has no entries, neither a `###` heading under "
+                "`## Glossary` nor a `**Term**:` line under a `##` section"
+            )
         return result
     for title, words in entries:
         if words > cap:
@@ -1948,9 +1942,10 @@ RULES: tuple[Rule, ...] = (
     Rule(
         4,
         "glossary-format",
-        f"the glossary is {GLOSSARY}, never a CONTEXT.md left unrenamed; each entry is a `###` "
-        "heading under `## Glossary`, never an upstream `**Term**:` line, and none exceeds 200 "
-        f"words. Where a {GLOSSARY_MAP} splits it by context, it is reported unchecked",
+        f"the glossary is {GLOSSARY}, never a CONTEXT.md left unrenamed, and no entry in it "
+        "exceeds 200 words, whether a `###` heading under `## Glossary` or a `**Term**:` line "
+        f"under any `##` section. Where a {GLOSSARY_MAP} splits it by context, it is reported "
+        "unchecked",
         rule_glossary_format,
     ),
     Rule(
