@@ -140,6 +140,9 @@ sets one.
 
 ### Removed
 
+- The pixi `test` environment. It had the same packages as `default`, and only a separate CI
+  test job used it. CI is now one job that runs in `default`, so every new repo carried the
+  environment and its part of `pixi.lock` for nothing.
 - The pages on the issue tracker, the triage labels and the domain docs are gone from
   `docs/agents/`. A machine set up with `/lab-setup` gives every agent all three as lab
   defaults, so a new repo needs none of them. Write your own page only where your repo is
@@ -148,6 +151,10 @@ sets one.
 
 ### Fixed
 
+- A new repo with no package no longer describes tests it does not have. `init-repo` now cuts
+  the test step from the gate in `AGENTS.md`: the words "plus `test`", the `test` row, and the
+  four traps, which are all about pytest or typer. It also drops `mkdocstrings-python` from the
+  docs environment and from `pixi.lock`. That repo's site has no API page, so nothing used it.
 - `conformance` no longer passes a `[tool.liulab.agent-docs]` key that checks nothing. A key
   with `*`, `?` or `[` in it now fails, because keys are plain path prefixes and a pattern
   matches no file. Where the keys under the site source match no Markdown page, the check of

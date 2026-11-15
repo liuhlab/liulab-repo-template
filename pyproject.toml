@@ -65,9 +65,6 @@ pyyaml = "*"
 [tool.pixi.feature.test.dependencies]
 pytest = "*"
 pytest-timeout = "*"
-# Declared here too, not inherited: the tests run conformance, and a test environment shaped
-# differently from this one would import-error on every test.
-pyyaml = "*"
 
 # Exact: at 0.0.x nothing promises the next patch is compatible.
 [tool.pixi.feature.docs.dependencies]
@@ -88,7 +85,6 @@ docs-build = "zensical build -f mkdocs.template.yml --clean --strict"
 # never installs the site builder.
 [tool.pixi.environments]
 default = { features = ["test"], solve-group = "default" }
-test = { features = ["test"], solve-group = "default" }
 docs = { features = ["docs"], solve-group = "default" }
 
 [tool.pixi.tasks]
