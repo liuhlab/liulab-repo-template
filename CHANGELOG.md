@@ -148,6 +148,9 @@ sets one.
 
 ### Fixed
 
+- `pixi run check` now runs the tests when a static step fails, and exits non-zero if either
+  failed. It used to stop at the first failing task, so one lint error hid every failing test.
+  A repo made earlier with tests can copy the `check` line from this one.
 - `conformance` no longer passes a `[tool.liulab.agent-docs]` key that checks nothing. A key
   with `*`, `?` or `[` in it now fails, because keys are plain path prefixes and a pattern
   matches no file. Where the keys under the site source match no Markdown page, the check of

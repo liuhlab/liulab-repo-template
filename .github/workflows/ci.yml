@@ -56,8 +56,8 @@ jobs:
           # Fail if `pixi.lock` no longer matches `pyproject.toml`, rather than silently
           # solving something else. This is what makes CI run the versions the laptop ran.
           locked: true
-      # `check-static` and `test` as two steps, not `check` as one: pixi skips a task whose
-      # dependency failed, and a step of its own runs regardless.
+      # `check-static` and `test` as two steps, not `check` as one, so each has its own
+      # verdict on the run page.
       - run: pixi run check-static
       - run: pixi run test
         if: ${{ !cancelled() }}
