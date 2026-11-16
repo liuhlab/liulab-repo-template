@@ -365,6 +365,13 @@ def check_shape(rung: Rung, stage: Path) -> list[str]:
     workflow = (stage / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     if "dogfood" in workflow:
         problems.append("ci.yml still carries the dogfood step")
+    # A job that skips drafts must keep them out of the ready run's concurrency group, or the
+    # skipped draft run can cancel the ready one that `gh pr ready` starts in the same second.
+    draft = "github.event.pull_request.draft"
+    skips_drafts = re.search(rf"(?m)^\s*if:.*{re.escape(draft)}", workflow)
+    group = re.search(r"(?m)^\s*group:(.*)$", workflow)
+    if skips_drafts and not (group and draft in group.group(1)):
+        problems.append("ci.yml skips drafts, and its concurrency group does not carry the draft")
     if packaged and not (stage / f"src/{rung.module}/__init__.py").is_file():
         problems.append(f"src/{rung.module}/ is not the renamed package")
     return problems

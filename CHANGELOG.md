@@ -190,3 +190,8 @@ sets one.
 - The suite budget's clock stops when the last test ends. pytest deletes its old temporary
   folders after that, and on a machine that keeps many of them, the deletion used to push a
   local run past a budget that CI met.
+- Marking a draft pull request ready right after a push now runs CI. The push and the ready
+  event arrived in the same second, and the two runs shared one concurrency group, so the
+  draft's run could cancel the real one and then skip itself, leaving no run at all. The draft
+  state is now part of the group's key. A repo made earlier can copy the `concurrency:` block
+  from `ci.yml` in this one.
