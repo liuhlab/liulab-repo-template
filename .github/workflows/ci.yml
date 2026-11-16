@@ -33,8 +33,12 @@ on:
 
 # Keyed on the workflow and the ref, so pushing again to a pull request cancels the run it
 # supersedes. A run started by hand is never cancelled.
+#
+# The draft state is in the key too. A push to a draft followed by marking it ready sends two
+# events within a second, one still a draft and one not. In one group, the draft run can be
+# queued second, cancel the real run, then skip its own job, and the pull request gets no run.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.draft }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
