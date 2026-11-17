@@ -7,9 +7,10 @@
 #
 # Every step invokes `pixi run <task>` and never a command line. The step list lives in
 # `pyproject.toml` — `check-static` names it once — so adding a step is one more word
-# there and nothing here. Conformance rule `workflow-step-tasks` holds every workflow in
-# the repo to it, and what it checks is that the command came from the task table: a step
-# may pass arguments after `--`, and the rule prints them rather than forbidding them.
+# there and nothing here. Conformance rule `workflow-step-tasks` holds every job that uses
+# pixi, in every workflow, to it, and what it checks is that the command came from the task
+# table: a step may pass arguments after `--`, and the rule prints them rather than
+# forbidding them.
 # It reads the `run:` line only, so `env:`, `working-directory:`, `shell:` and a local
 # composite action can still make a step do something no `pixi run` does here. Keeping
 # CI and a laptop the same is a habit this file keeps, not a property anything proves.
