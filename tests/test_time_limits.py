@@ -137,3 +137,23 @@ def test_the_slow_lane_holds_a_slow_test_to_neither_limit(pytester: pytest.Pytes
     result.assert_outcomes(passed=1)
     assert result.ret == pytest.ExitCode.OK
     result.stdout.fnmatch_lines(["suite time: not checked, because slow tests ran"])
+
+
+def test_the_slow_lane_passes_and_says_so_when_no_test_is_slow(pytester: pytest.Pytester) -> None:
+    scratch(pytester, "def test_quick():\n    pass\n", timeout=1, budget=30)
+    result = pytester.runpytest(*slow_lane())
+    assert result.ret == pytest.ExitCode.OK
+    result.stdout.fnmatch_lines(["no test is marked slow"])
+
+
+@pytest.mark.parametrize(
+    ("tests", "args"),
+    [("", []), ("def test_quick():\n    pass\n", ["-k", "matches_nothing"])],
+    ids=["empty suite", "unmatched -k"],
+)
+def test_any_other_run_that_collects_nothing_still_fails(
+    pytester: pytest.Pytester, tests: str, args: list[str]
+) -> None:
+    scratch(pytester, tests, timeout=1, budget=30)
+    result = pytester.runpytest(*args)
+    assert result.ret == pytest.ExitCode.NO_TESTS_COLLECTED
