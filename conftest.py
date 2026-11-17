@@ -2,8 +2,8 @@
 
 `suite_budget` in `[tool.pytest.ini_options]` is the most seconds a run may take, and
 `timeout`, read by pytest-timeout, the most one test may take. A test marked `slow` is held
-to neither: the default run deselects it, and a run in which one ran is not timed. A slow-lane
-run, one whose `-m` expression selects `slow`, that finds no test marked `slow` passes.
+to neither: the default run deselects it, and a run in which one ran is not timed. A `-m slow` run
+that finds no test marked `slow` passes.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ import time
 from collections.abc import Generator
 
 import pytest
-from _pytest.mark.expression import Expression
 
 SLOW = "slow"
 
@@ -72,10 +71,9 @@ class SuiteBudget:
 
 
 class EmptySlowLane:
-    """Turns "no tests collected" into a pass for a slow-lane run when no test is marked `slow`."""
+    """Turns "no tests collected" into a pass for a `-m slow` run when no test is marked `slow`."""
 
-    def __init__(self, markexpr: str) -> None:
-        self.lane = Expression.compile(markexpr).evaluate(lambda name, **_: name == SLOW)
+    def __init__(self) -> None:
         self.any_slow = False
         self.said = False
 
@@ -85,12 +83,8 @@ class EmptySlowLane:
         self.any_slow = any(item.get_closest_marker(SLOW) for item in items)
 
     def pytest_sessionfinish(self, session: pytest.Session) -> None:
-        """Pass a slow-lane run that had no slow test to select."""
-        if (
-            session.exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED
-            and self.lane
-            and not self.any_slow
-        ):
+        """Pass a `-m slow` run that had no slow test to select."""
+        if session.exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED and not self.any_slow:
             session.exitstatus = pytest.ExitCode.OK
             self.said = True
 
@@ -120,9 +114,8 @@ def pytest_configure(config: pytest.Config) -> None:
     budget = config.getini("suite_budget")
     if budget and not hasattr(config, "workerinput"):
         config.pluginmanager.register(SuiteBudget(budget), "suite-budget")
-    markexpr = config.option.markexpr
-    if markexpr and not hasattr(config, "workerinput"):
-        config.pluginmanager.register(EmptySlowLane(markexpr), "empty-slow-lane")
+    if config.option.markexpr.replace(" ", "") == SLOW and not hasattr(config, "workerinput"):
+        config.pluginmanager.register(EmptySlowLane(), "empty-slow-lane")
 
 
 @pytest.hookimpl(wrapper=True)

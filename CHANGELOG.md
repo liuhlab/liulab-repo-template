@@ -157,8 +157,8 @@ sets one.
 
 - `pixi run test-slow` passes in a repo with no test marked `slow`, and prints `no test is
   marked slow`. It used to exit 5, "no tests collected", so a lane most repos never use failed
-  there. Only a run whose `-m` expression selects `slow` is covered: an empty default run or a
-  `-k` that matches nothing still exits 5. A repo made earlier can copy `EmptySlowLane` from
+  there. Only `-m slow` is covered: an empty default run or a `-k` that matches nothing still
+  exits 5. A repo made earlier can copy `EmptySlowLane` from
   `conftest.py`.
 - `nodejs` has a floor of 22 beside `markdownlint-cli2`. The conda package does not bound it, so
   a fresh solve on linux-64 paired the linter with a Node.js from 2019 that cannot run it. The
