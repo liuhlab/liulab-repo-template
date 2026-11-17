@@ -9,6 +9,10 @@ sets one.
 
 ### Added
 
+- A 15-minute limit on the CI job. A hung job used to run for GitHub's default of 6 hours,
+  leaving the pull request's check pending and, on a private repo, billing every minute. The
+  per-test `timeout` cannot stop a test blocked in compiled code. A repo made earlier can copy
+  the `timeout-minutes:` line from `ci.yml` in this one.
 - Limits on test time. One test may take 2 s (`timeout`, read by pytest-timeout) and the whole
   run 45 s (`suite_budget`, read by a small plugin in `conftest.py`, which prints the run's
   time against it every time). A test marked `slow` is held to neither: the default run leaves
