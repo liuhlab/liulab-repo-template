@@ -2,7 +2,8 @@
 
 `suite_budget` in `[tool.pytest.ini_options]` is the most seconds a run may take, and
 `timeout`, read by pytest-timeout, the most one test may take. A test marked `slow` is held
-to neither: the default run deselects it, and a run in which one ran is not timed.
+to neither: the default run deselects it, and a run in which one ran is not timed. A `-m slow` run
+that finds no test marked `slow` passes.
 """
 
 from __future__ import annotations
@@ -69,6 +70,30 @@ class SuiteBudget:
         terminalreporter.write_line(self.verdict, red=self.over, bold=self.over)
 
 
+class EmptySlowLane:
+    """Turns "no tests collected" into a pass for a `-m slow` run when no test is marked `slow`."""
+
+    def __init__(self) -> None:
+        self.any_slow = False
+        self.said = False
+
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_collection_modifyitems(self, items: list[pytest.Item]) -> None:
+        """Look at every collected test, before `-m` and `-k` deselect any."""
+        self.any_slow = any(item.get_closest_marker(SLOW) for item in items)
+
+    def pytest_sessionfinish(self, session: pytest.Session) -> None:
+        """Pass a `-m slow` run that had no slow test to select."""
+        if session.exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED and not self.any_slow:
+            session.exitstatus = pytest.ExitCode.OK
+            self.said = True
+
+    def pytest_terminal_summary(self, terminalreporter: pytest.TerminalReporter) -> None:
+        """Say why the run passed."""
+        if self.said:
+            terminalreporter.write_line(f"no test is marked {SLOW}")
+
+
 def pytest_addoption(parser: pytest.Parser) -> None:
     """Register `suite_budget`."""
     parser.addini(
@@ -81,7 +106,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Register the `slow` marker, and the budget when one is set, outside xdist's workers."""
+    """Register the `slow` marker, and the budget and slow-lane plugins, outside xdist's workers."""
     config.addinivalue_line(
         "markers",
         f"{SLOW}: exempt from timeout and suite_budget, and deselected unless -m {SLOW}",
@@ -89,6 +114,8 @@ def pytest_configure(config: pytest.Config) -> None:
     budget = config.getini("suite_budget")
     if budget and not hasattr(config, "workerinput"):
         config.pluginmanager.register(SuiteBudget(budget), "suite-budget")
+    if config.option.markexpr.replace(" ", "") == SLOW and not hasattr(config, "workerinput"):
+        config.pluginmanager.register(EmptySlowLane(), "empty-slow-lane")
 
 
 @pytest.hookimpl(wrapper=True)
