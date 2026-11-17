@@ -1,0 +1,840 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The starting point for a new Liu Lab repo: one toolchain, one gate, and a script that customises the copy.">
+      
+      
+      
+        <link rel="canonical" href="https://liuhlab.github.io/liulab-repo-template/research/zensical-viability-2026-08-30/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.57">
+    
+    
+      
+        <title>Zensical vs mkdocs-material for the lab template - liulab-repo-template</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.5da3a30f.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#zensical-vs-mkdocs-material-for-the-lab-template" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="liulab-repo-template" class="md-header__button md-logo" aria-label="liulab-repo-template" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            liulab-repo-template
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Zensical vs mkdocs-material for the lab template
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/liuhlab/liulab-repo-template" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    liuhlab/liulab-repo-template
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="liulab-repo-template" class="md-nav__button md-logo" aria-label="liulab-repo-template" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    liulab-repo-template
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/liuhlab/liulab-repo-template" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    liuhlab/liulab-repo-template
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  The template
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#verdict-adopt-with-named-workarounds-but-as-opt-in-not-the-template-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Verdict: adopt with named workarounds — but as opt-in, not the template default
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-installpin-under-pixi" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Install/pin under pixi
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. Config
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-publishing-to-gh-pages-hard-constraint-workaround-required" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Publishing to gh-pages — HARD CONSTRAINT, workaround required
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-mkdocstrings-supported-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. mkdocstrings — supported [tested]
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-strict-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Strict mode
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-extension-parity-all-pass-except-exclude_docs-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        6. Extension parity — all pass except <code>exclude_docs</code> [tested]
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-alpha-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        7. Alpha risk
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gaps" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Gaps
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#follow-up-docs_dir-and-unpublished-subtrees" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Follow-up: docs_dir and unpublished subtrees
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#follow-up-nav-autogeneration-and-search-visibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Follow-up: nav autogeneration and search visibility
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="zensical-vs-mkdocs-material-for-the-lab-template">Zensical vs mkdocs-material for the lab template<a class="headerlink" href="#zensical-vs-mkdocs-material-for-the-lab-template" title="Permanent link">&para;</a></h1>
+<p>Researched 2026-08-30 against zensical 0.0.57. All claims below marked <strong>[tested]</strong> were
+verified by building a synthetic lab-shaped project (mkdocs.yml + <code>src/</code> package with
+numpy docstrings) against <code>zensical==0.0.57</code> + <code>mkdocstrings-python==2.0.7</code>.</p>
+<h2 id="verdict-adopt-with-named-workarounds-but-as-opt-in-not-the-template-default">Verdict: adopt with named workarounds — but as opt-in, not the template default<a class="headerlink" href="#verdict-adopt-with-named-workarounds-but-as-opt-in-not-the-template-default" title="Permanent link">&para;</a></h2>
+<p>Zensical builds our config unchanged and mkdocstrings works, including numpy style.
+Three things must be worked around: no <code>gh-deploy</code> (needs a hand-written Actions
+workflow), <code>exclude_docs:</code> is silently ignored, and a nav entry naming a missing file
+no longer fails <code>--strict</code>. Combined with a 0.0.x alpha shipping weekly with <code>!</code>-marked
+breaking commits, this is not yet safe as the default for three production repos.</p>
+<h2 id="1-installpin-under-pixi">1. Install/pin under pixi<a class="headerlink" href="#1-installpin-under-pixi" title="Permanent link">&para;</a></h2>
+<p><code>zensical</code> 0.0.57 is on conda-forge for linux-64/aarch64/ppc64le, osx-64/arm64, win-64
+(<a href="https://api.anaconda.org/package/conda-forge/zensical">anaconda.org API</a>);
+<code>mkdocstrings-python</code> 2.0.7 is too
+(<a href="https://api.anaconda.org/package/conda-forge/mkdocstrings-python">API</a>). No bioconda needed.</p>
+<div class="highlight"><pre><span></span><code><span class="k">[tool.pixi.feature.docs.dependencies]</span>
+<span class="n">zensical</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"==0.0.57"</span>
+<span class="n">mkdocstrings-python</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&gt;=2.0.7,&lt;3"</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="k">[tool.pixi.feature.docs.tasks]</span>
+<span class="n">docs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"zensical serve"</span>
+<span class="n">docs-build</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"zensical build --clean --strict"</span>
+</code></pre></div>
+<p><code>serve</code> accepts <code>-s/--strict</code> but prints "Warning: Strict mode is currently unsupported"
+and ignores it — omit it
+(<a href="https://github.com/zensical/zensical/blob/master/python/zensical/main.py">main.py L105-122</a>).
+<code>--clean</code> is what the official CI workflow uses
+(<a href="https://zensical.org/docs/publish-your-site/">publish-your-site</a>).</p>
+<h2 id="2-config">2. Config<a class="headerlink" href="#2-config" title="Permanent link">&para;</a></h2>
+<p>It reads <code>mkdocs.yml</code> directly. With no <code>-f</code>, autodiscovery tries <code>zensical.toml</code>,
+<code>mkdocs.yml</code>, <code>mkdocs.yaml</code> in that order
+(<a href="https://github.com/zensical/zensical/blob/master/python/zensical/main.py">main.py L71-76</a>),
+so both can coexist — <code>zensical.toml</code> wins, and <code>-f mkdocs.yml</code> overrides. Docs confirm
+"Use your existing <code>mkdocs.yml</code>. No need to create a <code>zensical.toml</code>"
+(<a href="https://zensical.org/compatibility/">compatibility</a>). <code>!ENV</code> and <code>INHERIT</code> are supported
+(<a href="https://github.com/zensical/zensical/blob/master/python/zensical/config.py">config.py</a>).</p>
+<p>Minimal equivalent (<a href="https://github.com/zensical/zensical/blob/master/python/zensical/bootstrap/zensical.toml">bootstrap zensical.toml</a>):</p>
+<div class="highlight"><pre><span></span><code><span class="k">[project]</span>
+<span class="n">site_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"liulab-data"</span>
+<span class="n">repo_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"https://github.com/liuhlab/liulab-data"</span>
+<span class="n">nav</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="n">Home</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"index.md"</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="n">API</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s2">"api/index.md"</span><span class="w"> </span><span class="p">},</span>
+<span class="p">]</span>
+</code></pre></div>
+<p><code>theme.name</code> is unnecessary: both <code>material</code> and <code>zensical</code> resolve to the built-in theme
+(<a href="https://github.com/zensical/zensical/blob/master/python/zensical/config.py">config.py <code>get_theme_dir</code></a>).</p>
+<h2 id="3-publishing-to-gh-pages-hard-constraint-workaround-required">3. Publishing to gh-pages — HARD CONSTRAINT, workaround required<a class="headerlink" href="#3-publishing-to-gh-pages-hard-constraint-workaround-required" title="Permanent link">&para;</a></h2>
+<p><strong>No <code>gh-deploy</code> equivalent, and it will not be built.</strong> "gh-deploy command: we plan to
+support many more deployment methods, so we're not implementing MkDocs' gh-deploy command"
+(<a href="https://zensical.org/compatibility/cli/">compatibility/cli</a>). The official workflow
+uses <code>actions/upload-pages-artifact</code> + <code>actions/deploy-pages</code>, which bypasses <code>gh-pages</code>
+entirely (<a href="https://zensical.org/docs/publish-your-site/">publish-your-site</a>).</p>
+<p>To keep the <code>gh-pages</code> branch:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docs</span>
+<span class="nt">on</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">push</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">]</span>
+<span class="nt">permissions</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+<span class="nt">jobs</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">docs</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v7</span><span class="w">          </span><span class="c1"># v7.0.1</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix-dev/setup-pixi@v0.10.2</span>
+<span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">environments</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docs</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pixi run -e docs docs-build</span><span class="w">   </span><span class="c1"># writes ./site</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">peaceiris/actions-gh-pages@v4</span><span class="w">  </span><span class="c1"># v4.1.0</span>
+<span class="w">        </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">github_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ secrets.GITHUB_TOKEN }}</span>
+<span class="w">          </span><span class="nt">publish_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./site</span>
+<span class="w">          </span><span class="nt">publish_branch</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gh-pages</span>
+<span class="w">          </span><span class="nt">force_orphan</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">               </span><span class="c1"># matches `gh-deploy --force`</span>
+</code></pre></div>
+<h2 id="4-mkdocstrings-supported-tested">4. mkdocstrings — supported [tested]<a class="headerlink" href="#4-mkdocstrings-supported-tested" title="Permanent link">&para;</a></h2>
+<p>Supported since 0.0.11, declared "preliminary"
+(<a href="https://zensical.org/docs/setup/extensions/mkdocstrings/">setup/extensions/mkdocstrings</a>).
+The <code>mkdocstrings</code> plugin block in <code>mkdocs.yml</code> is shimmed into a Markdown extension and
+the handler config is passed through verbatim, so all <code>mkdocstrings-python</code> options apply
+(<a href="https://github.com/zensical/zensical/blob/master/python/zensical/config.py">config.py <code>_shim_mkdocstrings</code></a>,
+<a href="https://github.com/zensical/zensical/blob/master/python/zensical/compat/mkdocstrings.py">compat/mkdocstrings.py</a>).</p>
+<p>Verified rendering with <code>paths: [src]</code>, <code>docstring_style: numpy</code>, <code>separate_signature</code>,
+<code>show_symbol_type_heading</code>, <code>signature_crossrefs</code>: parameter tables, symbol headings,
+source blocks, <code>objects.inv</code>, and <code>[x][mypkg.add]</code> cross-refs all render. <code>inventories:</code>
+downloads work. <strong>[tested]</strong></p>
+<p>What is lost:</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Status</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backlinks</td>
+<td>Not supported</td>
+<td><a href="https://zensical.org/docs/setup/extensions/mkdocstrings/">docs</a></td>
+</tr>
+<tr>
+<td>Watching <code>paths</code> outside project root</td>
+<td>Not watched; no rebuild on edit</td>
+<td><a href="https://zensical.org/docs/setup/extensions/mkdocstrings/">docs</a></td>
+</tr>
+<tr>
+<td><code>gen-files</code> / <code>literate-nav</code></td>
+<td>Backlog, unimplemented (Tier 2 / Tier 1)</td>
+<td><a href="https://zensical.org/compatibility/plugins/">compatibility/plugins</a></td>
+</tr>
+</tbody>
+</table>
+<p><code>paths: [src]</code> inside the repo is watched fine
+(<a href="https://github.com/zensical/zensical/blob/master/python/zensical/config.py">config.py <code>_list_sources</code></a>).</p>
+<h2 id="5-strict-mode">5. Strict mode<a class="headerlink" href="#5-strict-mode" title="Permanent link">&para;</a></h2>
+<p>Flag is <code>zensical build --strict</code> (<code>-s</code>), or <code>strict: true</code> in <code>mkdocs.yml</code> since 0.0.53
+(<a href="https://github.com/zensical/zensical/releases/tag/v0.0.53">v0.0.53 notes</a>,
+<a href="https://zensical.org/docs/setup/validation/">setup/validation</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Failure mode</th>
+<th>Strict result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dead internal link</td>
+<td>Warns, exits 1 <strong>[tested]</strong></td>
+</tr>
+<tr>
+<td>Dead anchor (<code>page.md#nope</code>)</td>
+<td>Warns (<code>invalid_link_anchors</code>, on by default) — <a href="https://zensical.org/docs/setup/validation/">docs</a></td>
+</tr>
+<tr>
+<td>Unresolvable mkdocstrings/autoref</td>
+<td>Warns "unresolved autoref", exits 1 <strong>[tested]</strong></td>
+</tr>
+<tr>
+<td><strong>Nav entry naming a missing file</strong></td>
+<td><strong>Silent. Build succeeds, dead nav link rendered [tested]</strong></td>
+</tr>
+<tr>
+<td>Missing <code>pymdownx.snippets</code> file</td>
+<td>Hard <code>SnippetMissingError</code>, exits 1 <strong>[tested]</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The nav case is a regression from <code>mkdocs build --strict</code>. <code>validation.nav.*</code> keys from
+MkDocs are dropped: only link settings are mapped
+(<a href="https://github.com/zensical/zensical/blob/master/python/zensical/config.py">config.py validation block</a> —
+"we only support validation of links right now").</p>
+<h2 id="6-extension-parity-all-pass-except-exclude_docs-tested">6. Extension parity — all pass except <code>exclude_docs</code> [tested]<a class="headerlink" href="#6-extension-parity-all-pass-except-exclude_docs-tested" title="Permanent link">&para;</a></h2>
+<p>Zensical runs real Python-Markdown 3.10 and pymdown-extensions 11.0.2 in-process, so
+extension behaviour is identical by construction
+(<a href="https://pypi.org/pypi/zensical/json">pyproject requires_dist</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>admonition, attr_list, md_in_html</td>
+<td>OK</td>
+</tr>
+<tr>
+<td>pymdownx.details, .highlight, .inlinehilite</td>
+<td>OK</td>
+</tr>
+<tr>
+<td>pymdownx.snippets (<code>base_path</code>, <code>check_paths</code>)</td>
+<td>OK; missing file fails build</td>
+</tr>
+<tr>
+<td>pymdownx.superfences + mermaid <code>custom_fence</code></td>
+<td>OK (<code>class="mermaid"</code> emitted; also a default)</td>
+</tr>
+<tr>
+<td>pymdownx.tabbed (<code>alternate_style</code>)</td>
+<td>OK</td>
+</tr>
+<tr>
+<td>toc <code>permalink</code></td>
+<td>OK</td>
+</tr>
+<tr>
+<td>search</td>
+<td>OK (<code>site/search.json</code>, search worker)</td>
+</tr>
+<tr>
+<td>GA4 via <code>extra.analytics</code></td>
+<td>OK (gtag + <code>G-…</code> emitted); <a href="https://zensical.org/docs/setup/analytics/">docs</a></td>
+</tr>
+<tr>
+<td><strong><code>exclude_docs:</code></strong></td>
+<td><strong>Silently ignored — excluded pages are published</strong></td>
+</tr>
+</tbody>
+</table>
+<p><code>exclude_docs</code> appears nowhere in the source; the <code>exclude</code> plugin is Tier 2 backlog
+(<a href="https://zensical.org/compatibility/plugins/">compatibility/plugins</a>). Workaround: keep
+drafts outside <code>docs_dir</code>.</p>
+<p>Also missing from Material parity: social cards, tag listings, blog, data privacy, the
+module/hook system (<a href="https://zensical.org/compatibility/features/">compatibility/features</a>).</p>
+<h2 id="7-alpha-risk">7. Alpha risk<a class="headerlink" href="#7-alpha-risk" title="Permanent link">&para;</a></h2>
+<p>Last 8 releases (<a href="https://pypi.org/pypi/zensical/json">PyPI JSON API</a>):</p>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Date</th>
+<th>Version</th>
+<th>Date</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.0.50</td>
+<td>2026-07-09</td>
+<td>0.0.54</td>
+<td>2026-08-13</td>
+</tr>
+<tr>
+<td>0.0.51</td>
+<td>2026-07-17</td>
+<td>0.0.55</td>
+<td>2026-08-16</td>
+</tr>
+<tr>
+<td>0.0.52</td>
+<td>2026-07-30</td>
+<td>0.0.56</td>
+<td>2026-08-18</td>
+</tr>
+<tr>
+<td>0.0.53</td>
+<td>2026-08-04</td>
+<td>0.0.57</td>
+<td>2026-08-21</td>
+</tr>
+</tbody>
+</table>
+<p>Roughly weekly, tightening to every 2-3 days in August. Documented churn:
+0.0.48 shipped a regression that broke search, hotfixed by 0.0.50 the same day
+(<a href="https://github.com/zensical/zensical/releases/tag/v0.0.50">v0.0.50</a>);
+0.0.56 deprecated <code>unresolved_references</code> outright
+(<a href="https://github.com/zensical/zensical/releases/tag/v0.0.56">v0.0.56</a>);
+<code>master</code> already carries a post-0.0.57 breaking commit
+<code>refactor!: remove x86 and armv7 musl builds</code> (34043fe). Classifier is
+<code>Development Status :: 3 - Alpha</code>, and the module/plugin API is deliberately unreleased
+(<a href="https://zensical.org/compatibility/plugins/">compatibility/plugins</a>).</p>
+<p><strong>Pin <code>zensical = "==0.0.57"</code> — exact, not a range.</strong> At 0.0.x there is no semver
+guarantee that <code>0.0.58</code> is compatible, and 0.0.48→0.0.50 proves a patch bump can break a
+core feature within hours. Bump deliberately and re-run <code>docs-build --strict</code>.</p>
+<h2 id="gaps">Gaps<a class="headerlink" href="#gaps" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Nav validation: I confirmed by test that a missing nav target does not fail; I found no
+  issue-tracker entry stating whether this is intended or planned.</li>
+<li>Backlinks: only the docs' one-line statement; no issue or code confirmation of scope.</li>
+<li>I did not install the conda-forge package, so I did not verify it ships the <code>zensical</code>
+  console script (the PyPI wheel does). Verify before committing the pixi lines.</li>
+<li>No <code>CHANGELOG.md</code> exists in the repo; release notes live only on GitHub Releases.</li>
+<li><code>https://zensical.org/llms-full.txt</code> and <code>https://zensical.org/docs/sitemap.md</code> both 404.</li>
+<li>Untested here: <code>mike</code> versioning, <code>zensical serve</code> live-reload against <code>src/</code>, and
+  build behaviour on a real lab repo (liulab-data, liulab-genome, eutely).</li>
+</ul>
+<h2 id="follow-up-docs_dir-and-unpublished-subtrees">Follow-up: docs_dir and unpublished subtrees<a class="headerlink" href="#follow-up-docs_dir-and-unpublished-subtrees" title="Permanent link">&para;</a></h2>
+<p><strong>1. <code>docs_dir</code> is honoured.</strong> Same literal key in both formats — <code>docs_dir: content/site</code>
+in <code>mkdocs.yml</code>, <code>docs_dir = "content/site"</code> under <code>[project]</code> in <code>zensical.toml</code>. Both
+built clean into <code>./site</code> <strong>[tested]</strong>. Two constraints, enforced at config load
+(<a href="https://github.com/zensical/zensical/blob/master/python/zensical/config.py">config.py <code>_apply_defaults</code></a>):
+<code>docs_dir</code> must resolve <em>inside</em> the project root (so no <code>../</code>), and must differ from
+<code>site_dir</code>. That leaves any in-repo subdirectory layout available.</p>
+<p><strong>2. No mechanism exists today to keep a subtree out of the built site.</strong> Every file under
+<code>docs_dir</code> is published, whether or not it appears in <code>nav</code> <strong>[tested]</strong>. Searching the
+source rather than the docs:</p>
+<ul>
+<li>Front matter honoured by the Rust side is only <code>title</code>, <code>template</code>, <code>tags</code>
+  (<code>meta.get(...)</code> in <code>crates/zensical/src/structure/</code>); templates additionally read
+  <code>hide</code>, <code>description</code>, <code>author</code>, <code>location</code>. <code>hide:</code> suppresses UI chrome, not the page —
+  a <code>draft: true</code> + <code>hide:</code> page still emitted <code>site/drafts/draft/index.html</code> <strong>[tested]</strong>.</li>
+<li>No <code>.pages</code> handling, no <code>not_in_nav</code>, no ignore/exclude/glob patterns, no per-directory
+  config anywhere in <code>crates/</code> or <code>python/</code>. The only <code>.gitignore</code> write is for the build
+  cache (<code>config.rs</code> <code>get_cache_dir</code>).</li>
+<li><code>awesome-nav</code> (<code>.pages</code>), <code>literate-nav</code> and <code>exclude</code> are all unimplemented backlog
+  items (<a href="https://zensical.org/compatibility/plugins/">compatibility/plugins</a>); nothing
+  states what <code>exclude</code> will support.</li>
+</ul>
+<p>Only workaround: keep unpublished content outside <code>docs_dir</code>.</p>
+<p><strong>3. A missing <code>docs_dir</code> is a hard error</strong>, not a warning: <code>Error: Docs directory does not
+exist: &lt;abs path&gt;</code>, exit 1, before any build work <strong>[tested]</strong>.</p>
+<h2 id="follow-up-nav-autogeneration-and-search-visibility">Follow-up: nav autogeneration and search visibility<a class="headerlink" href="#follow-up-nav-autogeneration-and-search-visibility" title="Permanent link">&para;</a></h2>
+<p><strong>1. Nav is auto-generated from the directory tree when <code>nav:</code> is absent.</strong> With no <code>nav:</code>
+key, a three-page site produced a navbar containing <code>Home</code>, <code>guide/</code> <em>and</em>
+<code>adr/0001-manifest/</code> <strong>[tested]</strong>. So eutely's current "no explicit nav" setup would put
+<code>docs/adr/</code>, <code>docs/research/</code> and <code>docs/agents/</code> straight into the navbar.
+<strong>The template must ship an explicit <code>nav:</code>.</strong>
+(<a href="https://github.com/zensical/zensical/blob/master/crates/zensical/src/structure/nav.rs">nav.rs <code>from(pages)</code></a>
+mirrors MkDocs' auto-population.)</p>
+<p><strong>2. A published page absent from <code>nav</code> IS indexed by default.</strong> Adding the ADR produced a
+third entry in <code>site/search.json</code> with its body text searchable <strong>[tested]</strong> — exactly the
+"searching <em>manifest</em> surfaces an ADR" case.</p>
+<p><strong>3. Yes — <code>search: exclude: true</code> front matter works, and it is the fix.</strong> Material's
+convention is honoured verbatim:</p>
+<div class="highlight"><pre><span></span><code><span class="nn">---</span>
+<span class="nt">search</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">exclude</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nn">---</span>
+</code></pre></div>
+<p>With it, the page dropped out of <code>search.json</code> entirely (2 items, body token absent);
+without it, 3 items <strong>[tested]</strong>. Implemented at
+<a href="https://github.com/zensical/zensical/blob/master/python/zensical/markdown/render.py">render.py L145-147</a>
+(<code>if meta.get("search", {}).get("exclude", False): search_processor.data = []</code>).
+Block-level <code>data-search-exclude</code> via <code>attr_list</code> also works
+(<a href="https://github.com/zensical/zensical/blob/master/python/zensical/extensions/search.py">extensions/search.py L146-148</a>).</p>
+<p>Two residues: an excluded page still appears in <code>sitemap.xml</code> <strong>[tested]</strong>, so search
+engines will index it; and front matter does not remove it from an auto-generated navbar —
+only an explicit <code>nav:</code> does.</p>
+<p><strong>Correction, 2026-08-31 (from #23, implementing this note).</strong> The sitemap residue is
+conditional on the navbar being auto-generated. With an explicit <code>nav:</code> present, zensical
+builds <code>sitemap.xml</code> from the nav, not from the file tree: a template build with two nav
+entries and seven unlisted pages produced a two-entry sitemap <strong>[tested]</strong>. The other claims
+here held exactly as written, including that a page with neither a nav entry nor front
+matter is published <em>and</em> indexed. The conda-forge package does ship the <code>zensical</code> console
+script, which closes the gap this note left open.</p>
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":[],"search":"../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.49251538.min.js"></script>
+      
+    
+  </body>
+</html>
