@@ -154,11 +154,12 @@ def publishes(root: Path, on: str) -> None:
 
 
 def runs(root: Path, *commands: str, job: str = "check") -> None:
-    """A `ci.yml` whose one job checks out an action and then runs each command given.
+    """A `ci.yml` whose one job sets up pixi and then runs each command given.
 
     Not `release.yml`: that path is rule 9's premise and rule 8's, and a rule 12 fixture must vary
     nothing but the commands. The leading `uses:` step is in every tree here on purpose — it is
-    what proves an action step is passed over rather than merely absent.
+    what proves an action step is passed over rather than merely absent, and it is setup-pixi so
+    that rule 12 checks the job whatever its commands are.
     """
     steps = "".join(f"      - run: {command}\n" for command in commands)
     write(
@@ -168,7 +169,7 @@ def runs(root: Path, *commands: str, job: str = "check") -> None:
         f"  {job}:\n"
         "    runs-on: ubuntu-latest\n"
         "    steps:\n"
-        "      - uses: actions/checkout@v7\n" + steps,
+        "      - uses: prefix-dev/setup-pixi@v0.11.3\n" + steps,
     )
 
 
@@ -1231,6 +1232,50 @@ def test_rule_11_says_it_cannot_tell_a_range_from_a_floor_nobody_lowered(repo: P
     ):
         assert said in printed
     assert "not checked: whether 3.12 is ever resolved or tested" in printed
+
+
+def test_rule_12_skips_a_job_that_never_uses_pixi(repo: Path) -> None:
+    # A job that builds an image needs no pixi environment, and the rule's own fix would install
+    # one only to run `docker`. The skip is named in the notes, so nothing is passed silently. An
+    # image named `pixi` is not a step that runs pixi.
+    write(
+        repo,
+        ".github/workflows/image.yml",
+        "name: image\non:\n  pull_request:\njobs:\n"
+        "  image:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v7\n"
+        "      - run: docker build --build-arg BASE=ghcr.io/prefix-dev/pixi:latest .\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["workflow-step-tasks"] == "--"
+    assert (
+        "not checked: 1 step(s) in 1 job(s) that do not use pixi: "
+        ".github/workflows/image.yml job `image`" in flat(proc.stdout)
+    )
+
+
+def test_rule_12_checks_a_job_that_runs_pixi_without_the_setup_action(repo: Path) -> None:
+    # pixi can come from somewhere other than setup-pixi. A job whose step runs it uses it, so its
+    # steps are checked: the declared task passes and the undeclared one is the only problem.
+    write(
+        repo,
+        ".github/workflows/ci.yml",
+        "name: ci\non:\n  pull_request:\njobs:\n"
+        "  check:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v7\n"
+        "      - run: pixi run build\n"
+        "      - run: pixi run typecheck\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["workflow-step-tasks"] == "FAIL"
+    assert "step 2 invokes `typecheck`, which this repo declares no task by" in proc.stderr
+    assert "workflow-step-tasks FAIL 1 problem(s)" in flat(proc.stdout)
 
 
 def test_rule_12_reads_past_the_environment_flag_to_the_task(repo: Path) -> None:

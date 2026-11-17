@@ -199,3 +199,10 @@ sets one.
   wrote their index as `$i`, which shellcheck reports as style warning SC2004, so a repo that
   runs shellcheck had to turn the warning off. The runner behaves as before. A repo made
   earlier can copy `scripts/check.sh` from this one and drop its workaround.
+- The workflow-step rule in `conformance` checks only the jobs that use pixi: a job with the
+  `prefix-dev/setup-pixi` step, or with a step that runs `pixi`. A job that builds an image
+  with docker, or calls the GitHub API, needs no pixi environment, and the rule's fix would
+  install one only to run a command the runner already has. Such a repo had to waive the rule
+  for every workflow, so nothing checked its gate. The notes count the steps skipped and name
+  each skipped job, on a passing run too. A repo that waived the rule for this reason can copy
+  `scripts/conformance.py` from this one and drop the waiver.

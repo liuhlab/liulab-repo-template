@@ -153,6 +153,10 @@ GLOB_CHARS = frozenset("*?[")
 PIXI_RUN = "pixi run"
 TASK_TABLE = "[tool.pixi.tasks]"
 
+#: The action that installs pixi in a job. Rule 12 checks a job with a step that uses it, or
+#: with a step that runs `pixi`, and no other.
+SETUP_PIXI = "prefix-dev/setup-pixi"
+
 #: Every `pixi run` option that takes a SEPARATE value, so the token after one is that value and
 #: never the task name. Both spellings of each, because a workflow writes either. The
 #: `--option=value` form needs no entry, being one token.
@@ -821,6 +825,27 @@ class Invocation:
 
     task: str
     arguments: tuple[str, ...]
+
+
+def _uses_pixi(step: Step) -> bool:
+    """Whether this step marks its job as one that uses pixi.
+
+    It uses the setup-pixi action, or its script runs `pixi` as a command word: a mention in a
+    comment, a quoted string or an image name does not count. A script that will not split counts,
+    so a job is never skipped on a parse failure.
+    """
+    if step.uses is not None:
+        return step.uses.split("@")[0].lower() == SETUP_PIXI
+    if step.run is None:
+        return False
+    lexer = shlex.shlex(
+        _EXPRESSION_RE.sub(EXPRESSION, step.run), posix=True, punctuation_chars=True
+    )
+    lexer.whitespace_split = True
+    try:
+        return any(token == "pixi" or token.endswith("/pixi") for token in lexer)
+    except ValueError:
+        return True
 
 
 def _invoked_task(run: str) -> Invocation | None:
@@ -1643,7 +1668,7 @@ def rule_python_version_agreement(repo: Repo) -> Result:
 
 
 def rule_workflow_step_tasks(repo: Repo) -> Result:
-    """12. Every workflow step that runs anything invokes a task the manifest declares.
+    """12. Every step that runs anything, in a job that uses pixi, invokes a declared task.
 
     What this verifies is that the command a step runs is DECLARED — its text lives in the task
     table, where a person can read it and a laptop can run it. It is not a guarantee that CI and
@@ -1653,8 +1678,11 @@ def rule_workflow_step_tasks(repo: Repo) -> Result:
     - only the `run:` line is read. `env:` at any of three scopes, `working-directory:`, `shell:`
       and `--manifest-path` all change what a step does without changing that line;
     - a step that `uses:` a local composite action runs whatever that action's steps run, and
-      reading those means parsing `.github/actions/**`;
-    - a task may pass arguments after `--`. They are printed in the notes rather than forbidden.
+      reading those means parsing `.github/actions/**`. A job that gets pixi from one is skipped;
+    - a task may pass arguments after `--`. They are printed in the notes rather than forbidden;
+    - a job that never uses pixi is not checked, since the fix would install an environment only
+      to run a command the runner already has. Its steps are counted and its job named in the
+      notes.
 
     Closing any of them means parsing foreign files in a check that ships to every lab repo, for
     a guarantee no wording here can make true. Say the limits instead.
@@ -1667,6 +1695,9 @@ def rule_workflow_step_tasks(repo: Repo) -> Result:
     if not running:
         result.notes.append("not checked: no tracked workflow has a step that runs a command")
         return result
+    pixi_jobs = {(s.workflow, s.job) for w in repo.workflows for s in w.steps if _uses_pixi(s)}
+    skipped = [step for step in running if (step.workflow, step.job) not in pixi_jobs]
+    running = [step for step in running if (step.workflow, step.job) in pixi_jobs]
     unresolved = 0
     passing: list[str] = []
     for step in running:
@@ -1704,10 +1735,17 @@ def rule_workflow_step_tasks(repo: Repo) -> Result:
                     "the step at a task that is declared",
                 )
             )
-    result.notes.append(
-        f"{len(running)} step(s) that run a command, across {len(repo.workflows)} workflow(s), "
-        f"against {len(repo.tasks)} declared task(s)"
-    )
+    if running:
+        result.notes.append(
+            f"{len(running)} step(s) that run a command, across {len(repo.workflows)} "
+            f"workflow(s), against {len(repo.tasks)} declared task(s)"
+        )
+    if skipped:
+        jobs = dict.fromkeys(f"{step.workflow} job `{step.job}`" for step in skipped)
+        result.notes.append(
+            f"not checked: {len(skipped)} step(s) in {len(jobs)} job(s) that do not use pixi: "
+            + "; ".join(jobs)
+        )
     # Printed on every run that has one, green runs included. An argument a workflow passes and a
     # laptop does not is a real difference between the two, and the rule no longer forbids it —
     # so the one thing left to do about it is make it visible without opening the workflow.
@@ -1833,8 +1871,8 @@ def rule_test_time_limits(repo: Repo) -> Result:
 
     `--timeout` is read in a task only when the task runs pytest, because the flag belongs to
     other tools too and a download that waits for a server is not a test time limit. A workflow
-    step can only invoke a task (rule 12), so a `--timeout` there is read as one whichever task it
-    goes to. `PYTEST_TIMEOUT` is read everywhere: it reaches pytest through any task that runs it.
+    step in a job that uses pixi can only invoke a task (rule 12), so a `--timeout` there is read
+    as one whichever task it goes to; one in a job that does not is read the same way. `PYTEST_TIMEOUT` is read everywhere: it reaches pytest through any task that runs it.
     """
     result = Result()
     why = (
@@ -2001,7 +2039,8 @@ RULES: tuple[Rule, ...] = (
     Rule(
         12,
         "workflow-step-tasks",
-        f"every workflow step that runs a command invokes a declared task — `{PIXI_RUN} <task>`, "
+        f"every step that runs a command, in a job that uses pixi, invokes a declared task — "
+        f"`{PIXI_RUN} <task>`, "
         f"with the task in {TASK_TABLE}, so the command CI runs is one a laptop can run too. "
         f"Arguments are allowed after `{ARGUMENT_SEPARATOR}` and printed in the notes; a shell "
         "operator is not an argument. A step that `uses:` an action is not a step of this build",
