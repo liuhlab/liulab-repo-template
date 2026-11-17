@@ -73,6 +73,8 @@ sets one.
 
 ### Changed
 
+- The zensical record says when a repo stays on mkdocs-material: when it needs an mkdocs plugin
+  or build hook that zensical lacks. That repo keeps its own record of why.
 - CI skips a draft pull request and runs when it is marked ready, so a pull request opened as
   a draft and readied once the local gate passes runs CI once. Pushes to a ready pull request
   still run it, and so does a run started by hand.
