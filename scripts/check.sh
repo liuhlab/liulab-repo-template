@@ -89,7 +89,7 @@ while [ "$i" -lt "$count" ]; do
         printf '%s' "$((SECONDS - started))" >"$capture_dir/$i.time"
         exit "$status"
     ) &
-    pids[$i]=$!
+    pids[i]=$!
     i=$((i + 1))
 done
 
@@ -100,9 +100,9 @@ elapsed=()
 i=0
 while [ "$i" -lt "$count" ]; do
     wait "${pids[$i]}"
-    statuses[$i]=$?
-    elapsed[$i]=$(cat "$capture_dir/$i.time" 2>/dev/null)
-    [ -n "${elapsed[$i]}" ] || elapsed[$i]="?"
+    statuses[i]=$?
+    elapsed[i]=$(cat "$capture_dir/$i.time" 2>/dev/null)
+    [ -n "${elapsed[$i]}" ] || elapsed[i]="?"
     i=$((i + 1))
 done
 

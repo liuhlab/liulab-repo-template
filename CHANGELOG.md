@@ -195,3 +195,7 @@ sets one.
   draft's run could cancel the real one and then skip itself, leaving no run at all. The draft
   state is now part of the group's key. A repo made earlier can copy the `concurrency:` block
   from `ci.yml` in this one.
+- `scripts/check.sh` passes shellcheck with its default settings. Four array assignments
+  wrote their index as `$i`, which shellcheck reports as style warning SC2004, so a repo that
+  runs shellcheck had to turn the warning off. The runner behaves as before. A repo made
+  earlier can copy `scripts/check.sh` from this one and drop its workaround.
