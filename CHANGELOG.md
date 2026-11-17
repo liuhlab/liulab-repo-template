@@ -153,6 +153,10 @@ sets one.
 
 ### Fixed
 
+- `nodejs` has a floor of 22 beside `markdownlint-cli2`. The conda package does not bound it, so
+  a fresh solve on linux-64 paired the linter with a Node.js from 2019 that cannot run it. The
+  floor is the minimum in the linter's own `engines.node`. `pixi.lock` is unchanged. A repo made
+  earlier can copy the line.
 - A new repo's README now names the lab's plugin as it is published:
   `/plugin marketplace add liuhlab/liulab-skills`, then `/plugin install lab@liulab`. The
   template's own README does too.

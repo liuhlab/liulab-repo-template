@@ -59,6 +59,8 @@ python-build = "*"
 # Exact: the jargon map and the grade-11 number were measured against this version.
 vale = "3.19.0.*"
 markdownlint-cli2 = "*"
+# markdownlint-cli2's package does not bound `nodejs`, so this is the floor its `engines.node` asks.
+nodejs = ">=22"
 # For conformance, which parses mkdocs.yml and runs in `default`.
 pyyaml = "*"
 
