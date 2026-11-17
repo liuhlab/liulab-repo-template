@@ -8,7 +8,9 @@ search:
 The site is built by `zensical`, pinned `==0.0.57`, not by mkdocs plus mkdocs-material.
 zensical reads the same `mkdocs.yml`, runs the same Python-Markdown extensions in-process,
 and renders mkdocstrings, so one repo can move back to mkdocs by changing two lines in
-`pyproject.toml` and dropping the zensical-only validation keys from `mkdocs.yml`.
+`pyproject.toml` and dropping the zensical-only validation keys from `mkdocs.yml`. A repo
+that needs hooks, or plugins besides mkdocstrings, makes that move and stays on
+mkdocs-material.
 
 ## Why this is surprising
 

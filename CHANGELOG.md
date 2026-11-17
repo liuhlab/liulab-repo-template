@@ -73,6 +73,12 @@ sets one.
 
 ### Changed
 
+- The conformance rule `workflow-step-tasks` now checks only the jobs that have pixi: a job
+  that uses `setup-pixi`, or one with a step that runs pixi. A job with neither, such as an
+  image build or a registry cleanup, is named in the notes and not checked. Before, the only
+  way out was a waiver, and a waiver turns the rule off for every workflow, `ci.yml` too. A
+  repo that waived the rule for this reason can copy `scripts/conformance.py` and drop the
+  waiver.
 - CI skips a draft pull request and runs when it is marked ready, so a pull request opened as
   a draft and readied once the local gate passes runs CI once. Pushes to a ready pull request
   still run it, and so does a run started by hand.
@@ -153,6 +159,14 @@ sets one.
 
 ### Fixed
 
+- A fresh `pixi lock` no longer gives markdownlint a Node.js too old to run it. The
+  `markdownlint-cli2` package accepts any `nodejs`, and on linux-64 the solver picked 12.4.0,
+  a 2019 build on which the `markdownlint` step crashes. `nodejs` now has a floor, the one
+  markdownlint-cli2 declares itself. This lock was already above it and did not change, so the
+  break showed only when a repo made from the template solved its lock again.
+- `scripts/check.sh` now passes shellcheck with every check on. Four array writes spelled the
+  index `$i`, which shellcheck reports as SC2004. A repo that turned SC2004 off for this file
+  can copy it and turn the check back on.
 - A new repo's README now names the lab's plugin as it is published:
   `/plugin marketplace add liuhlab/liulab-skills`, then `/plugin install lab@liulab`. The
   template's own README does too.

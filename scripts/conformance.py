@@ -153,6 +153,11 @@ GLOB_CHARS = frozenset("*?[")
 PIXI_RUN = "pixi run"
 TASK_TABLE = "[tool.pixi.tasks]"
 
+#: The action that installs pixi on a runner, and a script line that runs pixi. A job with
+#: neither never has pixi, so rule 12 lists it rather than checking it.
+SETUP_PIXI = "prefix-dev/setup-pixi"
+_PIXI_LINE_RE = re.compile(r"^\s*pixi(?:\s|$)", re.MULTILINE)
+
 #: Every `pixi run` option that takes a SEPARATE value, so the token after one is that value and
 #: never the task name. Both spellings of each, because a workflow writes either. The
 #: `--option=value` form needs no entry, being one token.
@@ -862,6 +867,19 @@ def _invoked_task(run: str) -> Invocation | None:
     if any(token in SHELL_OPERATORS for token in arguments):
         return None
     return Invocation(task=task, arguments=tuple(arguments))
+
+
+def _sets_up_pixi(steps: Iterable[Step]) -> bool:
+    """Whether a job has pixi: a step uses the setup action, or a script line runs pixi.
+
+    The second half keeps a job in rule 12 that gets pixi another way, from a container image or
+    an install script, so a job cannot leave the rule by running pixi without the action.
+    """
+    return any(
+        (step.uses or "").split("@")[0] == SETUP_PIXI
+        or (step.run is not None and _PIXI_LINE_RE.search(step.run) is not None)
+        for step in steps
+    )
 
 
 def _skip_options(tokens: list[str], index: int) -> int:
@@ -1643,7 +1661,7 @@ def rule_python_version_agreement(repo: Repo) -> Result:
 
 
 def rule_workflow_step_tasks(repo: Repo) -> Result:
-    """12. Every workflow step that runs anything invokes a task the manifest declares.
+    """12. Every step that runs anything, in a job that sets up pixi, invokes a declared task.
 
     What this verifies is that the command a step runs is DECLARED — its text lives in the task
     table, where a person can read it and a laptop can run it. It is not a guarantee that CI and
@@ -1658,14 +1676,36 @@ def rule_workflow_step_tasks(repo: Repo) -> Result:
 
     Closing any of them means parsing foreign files in a check that ships to every lab repo, for
     a guarantee no wording here can make true. Say the limits instead.
+
+    A job that never sets up pixi is listed in the notes and not checked. An image build or a
+    registry cleanup has no environment to run a task in, and the only other way out was a
+    waiver, which is per rule and so unchecked every workflow along with it.
     """
     result = Result()
+    jobs: dict[tuple[str, str], list[Step]] = {}
+    for workflow in repo.workflows:
+        for step in workflow.steps:
+            jobs.setdefault((step.workflow, step.job), []).append(step)
     # `uses:` steps are not examined at all, and that is the rule and not an exemption: an action
     # is a dependency the workflow pulls in, not a step of this repo's own build, and there is no
     # task for it to have been.
-    running = [step for w in repo.workflows for step in w.steps if step.run is not None]
+    running: list[Step] = []
+    without_pixi: list[str] = []
+    for (path, job), steps in jobs.items():
+        commands = [step for step in steps if step.run is not None]
+        if not commands:
+            continue
+        if _sets_up_pixi(steps):
+            running.extend(commands)
+        else:
+            without_pixi.append(f"{path} job `{job}` ({len(commands)} step(s))")
+    if without_pixi:
+        result.notes.append(
+            "not checked, because the job never sets up pixi: " + "; ".join(without_pixi)
+        )
     if not running:
-        result.notes.append("not checked: no tracked workflow has a step that runs a command")
+        if not without_pixi:
+            result.notes.append("not checked: no tracked workflow has a step that runs a command")
         return result
     unresolved = 0
     passing: list[str] = []
@@ -2001,10 +2041,11 @@ RULES: tuple[Rule, ...] = (
     Rule(
         12,
         "workflow-step-tasks",
-        f"every workflow step that runs a command invokes a declared task — `{PIXI_RUN} <task>`, "
-        f"with the task in {TASK_TABLE}, so the command CI runs is one a laptop can run too. "
-        f"Arguments are allowed after `{ARGUMENT_SEPARATOR}` and printed in the notes; a shell "
-        "operator is not an argument. A step that `uses:` an action is not a step of this build",
+        f"every workflow step that runs a command, in a job that sets up pixi, invokes a declared "
+        f"task — `{PIXI_RUN} <task>`, with the task in {TASK_TABLE}, so the command CI runs is "
+        f"one a laptop can run too. Arguments are allowed after `{ARGUMENT_SEPARATOR}` and "
+        "printed in the notes; a shell operator is not an argument. A step that `uses:` an action "
+        "is not a step of this build, and a job that never sets up pixi is listed, not checked",
         rule_workflow_step_tasks,
     ),
     Rule(

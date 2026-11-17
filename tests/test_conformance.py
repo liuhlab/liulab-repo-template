@@ -154,11 +154,12 @@ def publishes(root: Path, on: str) -> None:
 
 
 def runs(root: Path, *commands: str, job: str = "check") -> None:
-    """A `ci.yml` whose one job checks out an action and then runs each command given.
+    """A `ci.yml` whose one job sets up pixi with an action and then runs each command given.
 
     Not `release.yml`: that path is rule 9's premise and rule 8's, and a rule 12 fixture must vary
     nothing but the commands. The leading `uses:` step is in every tree here on purpose — it is
-    what proves an action step is passed over rather than merely absent.
+    what proves an action step is passed over rather than merely absent, and, being setup-pixi,
+    what keeps a job whose commands never mention pixi inside rule 12.
     """
     steps = "".join(f"      - run: {command}\n" for command in commands)
     write(
@@ -168,7 +169,7 @@ def runs(root: Path, *commands: str, job: str = "check") -> None:
         f"  {job}:\n"
         "    runs-on: ubuntu-latest\n"
         "    steps:\n"
-        "      - uses: actions/checkout@v7\n" + steps,
+        "      - uses: prefix-dev/setup-pixi@v0.11.3\n" + steps,
     )
 
 
@@ -1393,6 +1394,65 @@ def test_rule_12_is_vacuous_and_not_passing_when_no_workflow_runs_a_command(repo
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert statuses(proc)["workflow-step-tasks"] == "--"
     assert "not checked: no tracked workflow has a step that runs a command" in flat(proc.stdout)
+
+
+#: An image build, the shape that needed a waiver for the whole rule: a runner with no pixi, and
+#: commands that are not tasks because there is no environment to run a task in.
+IMAGE_YML = (
+    "name: image\non:\n  workflow_dispatch:\njobs:\n"
+    "  build:\n"
+    "    runs-on: ubuntu-latest\n"
+    "    steps:\n"
+    "      - uses: actions/checkout@v7\n"
+    "      - name: Free disk space\n"
+    "        run: sudo rm -rf /usr/share/dotnet\n"
+    "      - run: docker build .\n"
+)
+
+
+def test_rule_12_lists_a_job_that_never_sets_up_pixi_and_checks_the_rest(repo: Path) -> None:
+    # The pixi job in ci.yml is still checked, which a waiver would have switched off too: the
+    # count says one step was read, and the image job's two commands are named as not checked.
+    runs(repo, "pixi run build")
+    write(repo, ".github/workflows/image.yml", IMAGE_YML)
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["workflow-step-tasks"] == "ok"
+    printed = flat(proc.stdout)
+    assert "1 step(s) that run a command, across 2 workflow(s)" in printed
+    assert (
+        "not checked, because the job never sets up pixi: .github/workflows/image.yml job "
+        "`build` (2 step(s))" in printed
+    )
+
+
+def test_rule_12_is_vacuous_when_no_job_that_runs_a_command_sets_up_pixi(repo: Path) -> None:
+    write(repo, ".github/workflows/image.yml", IMAGE_YML)
+    proc = conformance(repo)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert statuses(proc)["workflow-step-tasks"] == "--"
+    assert "not checked, because the job never sets up pixi" in flat(proc.stdout)
+
+
+def test_rule_12_checks_a_job_that_runs_pixi_without_the_setup_action(repo: Path) -> None:
+    # pixi from a container image, not from setup-pixi. A job that runs pixi is in scope however
+    # it got pixi, so leaving out the action is not a way around the rule.
+    write(
+        repo,
+        ".github/workflows/ci.yml",
+        "name: ci\non:\n  pull_request:\njobs:\n"
+        "  check:\n"
+        "    runs-on: ubuntu-latest\n"
+        "    container: ghcr.io/prefix-dev/pixi:latest\n"
+        "    steps:\n"
+        "      - uses: actions/checkout@v7\n"
+        "      - run: pixi run build\n"
+        "      - run: rm -rf dist\n",
+    )
+    proc = conformance(repo)
+    assert proc.returncode == 1
+    assert statuses(proc)["workflow-step-tasks"] == "FAIL"
+    assert "job `check` step 2 runs a command rather than `pixi run <task>`" in proc.stderr
 
 
 def test_the_workflow_reader_flattens_every_job_and_not_just_the_first(repo: Path) -> None:

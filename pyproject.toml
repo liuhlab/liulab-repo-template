@@ -59,6 +59,9 @@ python-build = "*"
 # Exact: the jargon map and the grade-11 number were measured against this version.
 vale = "3.19.0.*"
 markdownlint-cli2 = "*"
+# markdownlint-cli2 asks conda for any nodejs, and a fresh linux-64 solve then picks a build too
+# old to run it. The floor is the `engines` field of markdownlint-cli2's own package.json.
+nodejs = ">=22"
 # For conformance, which parses mkdocs.yml and runs in `default`.
 pyyaml = "*"
 
