@@ -50,6 +50,8 @@ jobs:
     # Skipped on a draft, which bills nothing. A run by hand has no pull request, so it runs.
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
+    # A job that hangs stops at this limit instead of GitHub's default of 6 hours.
+    timeout-minutes: 15
     steps:
       # A real checkout, not a source archive: `conformance` shells out to `git ls-files`
       # and exits 2 without a `.git` — its "could not run", spelled apart from the 1 a
