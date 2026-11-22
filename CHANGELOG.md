@@ -9,6 +9,12 @@ sets one.
 
 ### Added
 
+- A warning when a test nears its time limit. A test that takes more than
+  `timeout_warn_share` of `timeout` (40% here) is named in the run's summary with its time,
+  and the run still passes, so a slower CI runner's margin shows before it fails the test. A
+  `slow` test is not named. Two of the template's own tests sleep less, to stay under it.
+- A test that the paragraph `init-repo` cuts from `AGENTS.md` is still that file's text. The
+  copy had drifted, so a repo with no tests kept the paragraph.
 - A 15-minute limit on the CI job. A hung job used to run for GitHub's default of 6 hours,
   leaving the pull request's check pending and, on a private repo, billing every minute. The
   per-test `timeout` cannot stop a test blocked in compiled code. A repo made earlier can copy

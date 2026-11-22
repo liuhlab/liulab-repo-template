@@ -203,9 +203,11 @@ xfail_strict = true
 filterwarnings = ["error"]
 # The two time limits, here and nowhere else: conformance fails a copy in a workflow, a task or
 # a test. `conftest.py` reads `suite_budget`; pytest-timeout reads `timeout`, which covers a
-# test's setup, call and teardown. A test marked `slow` is held to neither.
+# test's setup, call and teardown. `conftest.py` names a test past `timeout_warn_share` of
+# `timeout`, and still passes it. A test marked `slow` is held to none of them.
 timeout = 2
 suite_budget = 45
+timeout_warn_share = 0.4
 
 # ============================== liulab ==============================
 # Read by `scripts/conformance.py`; its docstring has the rules.

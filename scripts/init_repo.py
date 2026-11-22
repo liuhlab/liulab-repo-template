@@ -103,6 +103,7 @@ TEMPLATE_ONLY = (
     "scripts/init_repo.py",
     # Tests of the template's own configuration, not of the new repo's code.
     "tests/test_conformance.py",
+    "tests/test_init_repo.py",
     "tests/test_quoted_evidence.py",
 )
 
@@ -167,9 +168,11 @@ AGENTS_TIME_LIMITS = (
     "Test time has two limits, set in `[tool.pytest.ini_options]` and nowhere else:\n"
     "\n"
     "- **`timeout`** caps one test, setup and teardown included.\n"
+    "- **`timeout_warn_share`** names a test past that share of `timeout`, which a slower runner\n"
+    "  may cross. The run still passes.\n"
     "- **`suite_budget`** caps a run with no slow test in it, and prints its time against it.\n"
-    "- **The slow lane:** a test marked `slow` is held to neither, and runs only in\n"
-    "  `pixi run test-slow`.\n"
+    "- **The slow lane:** a test marked `slow` is held to none of these, and runs only in\n"
+    "  `pixi run test-slow`, which passes when none is marked.\n"
     "\n"
 )
 

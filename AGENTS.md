@@ -67,8 +67,10 @@ the merge commit.
 Test time has two limits, set in `[tool.pytest.ini_options]` and nowhere else:
 
 - **`timeout`** caps one test, setup and teardown included.
+- **`timeout_warn_share`** names a test past that share of `timeout`, which a slower runner
+  may cross. The run still passes.
 - **`suite_budget`** caps a run with no slow test in it, and prints its time against it.
-- **The slow lane:** a test marked `slow` is held to neither, and runs only in
+- **The slow lane:** a test marked `slow` is held to none of these, and runs only in
   `pixi run test-slow`, which passes when none is marked.
 
 Four traps in the gate:

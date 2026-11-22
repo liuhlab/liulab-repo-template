@@ -1,9 +1,11 @@
-"""The suite budget and the slow lane.
+"""The suite budget, the timeout warning and the slow lane.
 
 `suite_budget` in `[tool.pytest.ini_options]` is the most seconds a run may take, and
-`timeout`, read by pytest-timeout, the most one test may take. A test marked `slow` is held
-to neither: the default run deselects it, and a run in which one ran is not timed. A `-m slow` run
-that finds no test marked `slow` passes.
+`timeout`, read by pytest-timeout, the most one test may take, setup and teardown included. A
+test that takes more than `timeout_warn_share` of `timeout` is named in the summary, and the run
+still passes, so a slower runner's margin shows before it fails the test. A test marked `slow`
+is held to none of them: the default run deselects it, and a run in which one ran is not timed.
+A `-m slow` run that finds no test marked `slow` passes.
 """
 
 from __future__ import annotations
@@ -70,6 +72,35 @@ class SuiteBudget:
         terminalreporter.write_line(self.verdict, red=self.over, bold=self.over)
 
 
+class NearTheTimeout:
+    """Names each test that took more than a share of `timeout`, and never fails the run."""
+
+    def __init__(self, timeout: float, share: float) -> None:
+        self.timeout = timeout
+        self.share = share
+        self.took: dict[str, float] = {}
+
+    def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
+        """Sum a test's setup, call and teardown, which pytest-timeout times together."""
+        if SLOW_TAG not in report.user_properties:
+            self.took[report.nodeid] = self.took.get(report.nodeid, 0.0) + report.duration
+
+    def pytest_terminal_summary(self, terminalreporter: pytest.TerminalReporter) -> None:
+        """Print each test past the share, slowest first."""
+        mark = self.share * self.timeout
+        near = sorted((took, test) for test, took in self.took.items() if took > mark)
+        if not near:
+            return
+        limit = f"{self.timeout:g} s timeout"
+        terminalreporter.write_line(
+            f"near the timeout: over {self.share:.0%} of the {limit}, "
+            "which a slower runner may cross",
+            yellow=True,
+        )
+        for took, test in reversed(near):
+            terminalreporter.write_line(f"  {test}: {took:.2f} s of its {limit}")
+
+
 class EmptySlowLane:
     """Turns "no tests collected" into a pass for a `-m slow` run when no test is marked `slow`."""
 
@@ -95,7 +126,7 @@ class EmptySlowLane:
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """Register `suite_budget`."""
+    """Register `suite_budget` and `timeout_warn_share`."""
     parser.addini(
         "suite_budget",
         "Most seconds a run may take; a run in which a slow test ran is not timed. "
@@ -103,17 +134,28 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         type="float",
         default=0.0,
     )
+    parser.addini(
+        "timeout_warn_share",
+        "Share of timeout past which a test is named in the summary; the run still passes. "
+        "0 or unset: no warning.",
+        type="float",
+        default=0.0,
+    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Register the `slow` marker, and the budget and slow-lane plugins, outside xdist's workers."""
+    """Register the `slow` marker, and the time-limit and slow-lane plugins off xdist's workers."""
     config.addinivalue_line(
         "markers",
-        f"{SLOW}: exempt from timeout and suite_budget, and deselected unless -m {SLOW}",
+        f"{SLOW}: exempt from the time limits and their warning, and deselected unless -m {SLOW}",
     )
     budget = config.getini("suite_budget")
     if budget and not hasattr(config, "workerinput"):
         config.pluginmanager.register(SuiteBudget(budget), "suite-budget")
+    share = config.getini("timeout_warn_share")
+    timeout = float(config.getini("timeout") or 0) if share else 0
+    if timeout and not hasattr(config, "workerinput"):
+        config.pluginmanager.register(NearTheTimeout(timeout, share), "near-the-timeout")
     if config.option.markexpr.replace(" ", "") == SLOW and not hasattr(config, "workerinput"):
         config.pluginmanager.register(EmptySlowLane(), "empty-slow-lane")
 
