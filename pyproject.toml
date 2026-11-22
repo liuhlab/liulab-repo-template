@@ -100,7 +100,9 @@ build = "python -m build"
 # `.`, never an absolute path: an absolute path matches no `.vale.ini` section and exits 0.
 # The globs stop vale walking trees it never lints — check.sh runs steps concurrently, and a
 # walk of .pixi/ races pytest writing __pycache__ there.
-vale = "vale --glob='!{.pixi,site,dist,build}/**' ."
+# vale reads its own globs, not `.gitignore`, so `.playwright-mcp/` is named here too, at any
+# depth.
+vale = "vale --glob='!{.pixi,site,dist,build,**/.playwright-mcp}/**' ."
 markdownlint = "markdownlint-cli2"
 conformance = "python scripts/conformance.py"
 # The static step list lives here and nowhere else; `check.sh` takes it as arguments.
