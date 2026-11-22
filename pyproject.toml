@@ -97,19 +97,20 @@ typecheck = "pyright"
 test = "pytest"
 test-slow = "pytest -m slow"
 build = "python -m build"
-# `.`, never an absolute path: an absolute path matches no `.vale.ini` section and exits 0.
-# The globs stop vale walking trees it never lints — check.sh runs steps concurrently, and a
-# walk of .pixi/ races pytest writing __pycache__ there.
-# vale reads its own globs, not `.gitignore`, so `.playwright-mcp/` is named here too, at any
-# depth.
-vale = "vale --glob='!{.pixi,site,dist,build,**/.playwright-mcp}/**' ."
+# vale lints the files git lists and never walks the tree: check.sh runs steps concurrently, and
+# a walk races any step writing a cache in it. So `.gitignore` is vale's only skip list. The
+# paths stay relative, because an absolute path matches no `.vale.ini` section and exits 0.
+# `-z` keeps a name with a space whole. The guard fails the task outside a git checkout, where
+# vale would lint nothing and pass. A file deleted but not yet staged fails it until the
+# deletion is staged.
+vale = "git rev-parse --is-inside-work-tree > /dev/null && git ls-files -z --cached --others --exclude-standard | xargs -0 vale"
 markdownlint = "markdownlint-cli2"
 conformance = "python scripts/conformance.py"
 # The static step list lives here and nowhere else; `check.sh` takes it as arguments.
 check-static = "bash scripts/check.sh lint fmt-check typecheck vale markdownlint conformance"
 # `test` runs whatever `check-static` returned; `depends-on` would skip it. After it, not beside
-# it, so pytest's time limits and vale's walk of `tests/` never share the machine. pixi's task
-# shell has `$?` but no arithmetic.
+# it, so pytest's time limits never share the machine with the static steps. pixi's task shell
+# has `$?` but no arithmetic.
 check = "pixi run check-static; static=$?; pixi run test && exit $static"
 # init-repo:begin dogfood
 # Markers read by `scripts/init_repo.py`, which deletes this block and its twin in ci.yml.
