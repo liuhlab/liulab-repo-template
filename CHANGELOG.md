@@ -17,10 +17,10 @@ sets one.
   `[tool.pytest.ini_options]`. Three of the template's own tests got faster, to stay under it.
 - A test that keeps the paragraph `init-repo` cuts from `AGENTS.md` the same as that file's
   text. The copy had drifted, so a repo with no tests kept the paragraph.
-- `.playwright-mcp/` in `.gitignore`, and in the folders the `vale` task skips. The Playwright
+- `.playwright-mcp/` in `.gitignore`, which keeps both writing checks out of it. The Playwright
   MCP server saves its screenshots, page snapshots and `find` results there, wherever the agent
-  started. vale reads its own globs, not `.gitignore`. A repo made earlier can copy the
-  `.gitignore` line and the `--glob` in the `vale` task from `pyproject.toml` in this one.
+  started. A repo made earlier can copy the `.gitignore` line from this one, and the `vale`
+  line under Fixed so vale skips the folder too.
 - The docs-site setup for hand-drawn SVG diagrams, so a repo's first diagram needs only its
   own file and colours. `pymdownx.snippets` inlines a diagram file into a page, with
   `check_paths: true` so a wrong path fails the build instead of leaving an empty figure.
@@ -179,6 +179,13 @@ sets one.
 
 ### Fixed
 
+- The `vale` task no longer fails at random while ruff writes its cache beside it. vale walked
+  the whole tree, so a file another step renamed during the walk stopped it with exit 2. Its
+  `--glob` skip list only chose which files it linted, never where it walked. It now lints the
+  files git lists, tracked and untracked but not ignored, so `.gitignore` is its only skip list
+  and it never enters `.pixi/`, a cache folder or an agent worktree. Outside a git checkout the
+  task fails. A file deleted but not yet staged fails it too, until the deletion is staged. A
+  repo made earlier can copy the `vale` line from `pyproject.toml` in this one.
 - `pixi run test-slow` passes in a repo with no test marked `slow`, and prints `no test is
   marked slow`. It used to exit 5, "no tests collected", so a lane most repos never use failed
   there. Only `-m slow` is covered: an empty default run or a `-k` that matches nothing still
