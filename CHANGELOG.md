@@ -13,6 +13,14 @@ sets one.
   MCP server saves its screenshots, page snapshots and `find` results there, wherever the agent
   started. vale reads its own globs, not `.gitignore`. A repo made earlier can copy the
   `.gitignore` line and the `--glob` in the `vale` task from `pyproject.toml` in this one.
+- The docs-site setup for hand-drawn SVG diagrams, so a repo's first diagram needs only its
+  own file and colours. `pymdownx.snippets` inlines a diagram file into a page, with
+  `check_paths: true` so a wrong path fails the build instead of leaving an empty figure.
+  `docs/stylesheets/diagrams.css` makes the figure full width and defines four neutral
+  colour tokens (text, fill, stroke, accent) for both colour schemes. A token for a meaning
+  such as "store" is a repo's own, added beside them. markdownlint allows `<figure>` and
+  `<figcaption>` and still fails any other inline HTML. A repo made earlier can copy the
+  three pieces from this one.
 - A 15-minute limit on the CI job. A hung job used to run for GitHub's default of 6 hours,
   leaving the pull request's check pending and, on a private repo, billing every minute. The
   per-test `timeout` cannot stop a test blocked in compiled code. A repo made earlier can copy
