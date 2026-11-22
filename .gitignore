@@ -25,3 +25,5 @@ __pycache__/
 # needs another machine's copy.
 /.codex/
 /.gemini/
+# The Playwright MCP server writes its screenshots and page snapshots here.
+.playwright-mcp/
