@@ -38,7 +38,7 @@ misfires, is as much a contribution as adding one.
 ```text
 src/newpkg/       the package — rename this directory first
 tests/            pytest, mirroring src/
-conftest.py       the suite budget and the slow lane
+conftest.py       the suite budget, the timeout warning and the slow lane
 docs/             the published site; docs/adr/ and docs/agents/ are agent-facing
 skills/           repo-local agent skills; `python skills/install.py --help`
 scripts/check.sh  the gate runner
@@ -64,11 +64,13 @@ environment, and CI runs it as a step of its own.
 Work on a branch and merge through a pull request. CI runs on pull requests only, and tests
 the merge commit.
 
-Test time has two limits, set in `[tool.pytest.ini_options]` and nowhere else:
+Test time has two limits, set in `[tool.pytest.ini_options]` and nowhere else, and a warning:
 
 - **`timeout`** caps one test, setup and teardown included.
 - **`suite_budget`** caps a run with no slow test in it, and prints its time against it.
-- **The slow lane:** a test marked `slow` is held to neither, and runs only in
+- **`near_timeout_share`** names a passing test that takes this share of `timeout` or more,
+  which a slower runner may cross. The run still passes.
+- **The slow lane:** a test marked `slow` is held to none of these, and runs only in
   `pixi run test-slow`, which passes when none is marked.
 
 Four traps in the gate:

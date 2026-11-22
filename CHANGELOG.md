@@ -9,6 +9,14 @@ sets one.
 
 ### Added
 
+- A warning when a test nears its time limit. A passing test that takes
+  `near_timeout_share` of `timeout` or more (40% here) is named in the run's summary with its
+  time, and the run still passes, so a slower CI runner's margin shows before it fails the
+  test. A test with no timer, such as a `slow` one, is not named. A repo made earlier can copy
+  `conftest.py` from this one and add `near_timeout_share = 0.4` to its
+  `[tool.pytest.ini_options]`. Three of the template's own tests got faster, to stay under it.
+- A test that keeps the paragraph `init-repo` cuts from `AGENTS.md` the same as that file's
+  text. The copy had drifted, so a repo with no tests kept the paragraph.
 - `.playwright-mcp/` in `.gitignore`, and in the folders the `vale` task skips. The Playwright
   MCP server saves its screenshots, page snapshots and `find` results there, wherever the agent
   started. vale reads its own globs, not `.gitignore`. A repo made earlier can copy the

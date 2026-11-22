@@ -103,6 +103,7 @@ TEMPLATE_ONLY = (
     "scripts/init_repo.py",
     # Tests of the template's own configuration, not of the new repo's code.
     "tests/test_conformance.py",
+    "tests/test_init_repo.py",
     "tests/test_quoted_evidence.py",
 )
 
@@ -164,12 +165,14 @@ MARKED_BLOCKS = (
 
 #: The paragraph in `AGENTS.md` on pytest's time limits, which a repo with no tests cuts.
 AGENTS_TIME_LIMITS = (
-    "Test time has two limits, set in `[tool.pytest.ini_options]` and nowhere else:\n"
+    "Test time has two limits, set in `[tool.pytest.ini_options]` and nowhere else, and a warning:\n"
     "\n"
     "- **`timeout`** caps one test, setup and teardown included.\n"
     "- **`suite_budget`** caps a run with no slow test in it, and prints its time against it.\n"
-    "- **The slow lane:** a test marked `slow` is held to neither, and runs only in\n"
-    "  `pixi run test-slow`.\n"
+    "- **`near_timeout_share`** names a passing test that takes this share of `timeout` or more,\n"
+    "  which a slower runner may cross. The run still passes.\n"
+    "- **The slow lane:** a test marked `slow` is held to none of these, and runs only in\n"
+    "  `pixi run test-slow`, which passes when none is marked.\n"
     "\n"
 )
 

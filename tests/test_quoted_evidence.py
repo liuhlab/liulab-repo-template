@@ -14,9 +14,10 @@ Two mechanics the tests depend on, both measured against these tools:
 - **ruff is handed a DIRECTORY, never the file.** `force-exclude` is off by default, so a path
   named on the command line is formatted even where the configuration excludes it. `fmt-check`
   passes `.`, so a directory is what the gate does anyway.
-- **markdownlint runs from the repo root.** It does not look above its working directory for a
-  configuration, so the same file linted from `docs/research/` is checked by markdownlint's
-  defaults and not by this repo's.
+- **markdownlint runs from the repo root, on the one file.** It does not look above its working
+  directory for a configuration, so the same file linted from `docs/research/` is checked by
+  markdownlint's defaults and not by this repo's. `--no-globs` drops the configuration's
+  every-file glob and keeps its rules.
 
 Both fixtures are written, read by the tools, and removed. Nothing is committed under
 `docs/research/`.
@@ -92,10 +93,10 @@ def fmt_check(directory: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def markdownlint() -> subprocess.CompletedProcess[str]:
-    """The `markdownlint` task, which its own configuration widens to every file in the repo."""
+def markdownlint(path: Path) -> subprocess.CompletedProcess[str]:
+    """The `markdownlint` task's configuration, on one file."""
     return subprocess.run(
-        ["markdownlint-cli2"],
+        ["markdownlint-cli2", "--no-globs", str(path.relative_to(REPO))],
         cwd=REPO,
         capture_output=True,
         text=True,
@@ -110,10 +111,10 @@ def test_a_research_note_may_quote_code_verbatim(quotation: Callable[[str], Path
     formatter = fmt_check("docs/research")
     assert formatter.returncode == 0, formatter.stdout
 
-    linter = markdownlint()
-    # The run covers every Markdown file in the repo, so its exit status is not this test's to
-    # claim. That it never names this file is.
-    assert path.name not in linter.stdout + linter.stderr
+    linter = markdownlint(path)
+    assert linter.returncode == 0, linter.stdout + linter.stderr
+    # A run that lints nothing exits 0 too.
+    assert "Linting: 1 file\n" in linter.stdout, linter.stdout
 
 
 def test_the_same_quotation_elsewhere_is_still_formatted(
