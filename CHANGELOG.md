@@ -9,8 +9,10 @@ sets one.
 
 ### Added
 
-- `.playwright-mcp/` in `.gitignore`. The Playwright MCP server saves its screenshots and
-  page snapshots there, under the workspace root.
+- `.playwright-mcp/` in `.gitignore`, and in the folders the `vale` task skips. The Playwright
+  MCP server saves its screenshots, page snapshots and `find` results there, wherever the agent
+  started. vale reads its own globs, not `.gitignore`. A repo made earlier can copy the
+  `.gitignore` line and the `--glob` in the `vale` task from `pyproject.toml` in this one.
 - A 15-minute limit on the CI job. A hung job used to run for GitHub's default of 6 hours,
   leaving the pull request's check pending and, on a private repo, billing every minute. The
   per-test `timeout` cannot stop a test blocked in compiled code. A repo made earlier can copy
