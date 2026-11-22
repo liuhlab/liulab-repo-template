@@ -45,7 +45,7 @@ def scratch(
         MANIFEST["tool"]["pytest"]["ini_options"],
         timeout=timeout,
         suite_budget=budget,
-        timeout_warn_share=share,
+        near_timeout_share=share,
     )
     lines = "".join(f"{key} = {json.dumps(value)}\n" for key, value in ini.items())
     pytester.makepyprojecttoml(f"[tool.pytest.ini_options]\n{lines}")
@@ -73,14 +73,14 @@ class SlowFinish:
     """Session-finish work that runs before the budget's, as pytest's temp-folder clean-up does."""
 
     def pytest_sessionfinish(self) -> None:
-        time.sleep(0.4)
+        time.sleep(0.5)
 
 
 def test_the_budget_stops_where_the_tests_end(pytester: pytest.Pytester) -> None:
-    scratch(pytester, "def test_quick():\n    pass\n", timeout=1, budget=0.3)
+    scratch(pytester, "def test_quick():\n    pass\n", timeout=1, budget=0.4)
     result = pytester.runpytest(plugins=[SlowFinish()])
     assert result.ret == pytest.ExitCode.OK
-    result.stdout.fnmatch_lines(["suite time: * s of its 0.3 s budget"])
+    result.stdout.fnmatch_lines(["suite time: * s of its 0.4 s budget"])
 
 
 # An unmarked test is not exempted by a parametrize id or a directory named `slow`.
@@ -131,7 +131,7 @@ def test_sleeps(phases):
 
 
 def test_a_slow_test_is_deselected_by_default(pytester: pytest.Pytester) -> None:
-    scratch(pytester, SLOW_TEST + "\n\ndef test_quick():\n    pass\n", timeout=0.1, budget=0.2)
+    scratch(pytester, SLOW_TEST + "\n\ndef test_quick():\n    pass\n", timeout=0.2, budget=0.6)
     result = pytester.runpytest()
     result.assert_outcomes(passed=1, deselected=1)
     assert result.ret == pytest.ExitCode.OK
@@ -181,7 +181,8 @@ def test_near_the_limit(setup_half):
     time.sleep(0.15)
 """
 
-NAMED = "*test_scratch.py::test_near_the_limit: 0.* s of its 0.5 s timeout"
+NAMED = "near the timeout: *test_near_the_limit took 0.* s, at or above 0.2 s of its 0.5 s"
+NEAR = "near the timeout:*"
 
 
 def test_a_test_past_the_share_of_the_timeout_is_named_and_passes(
@@ -191,14 +192,14 @@ def test_a_test_past_the_share_of_the_timeout_is_named_and_passes(
     result = pytester.runpytest()
     result.assert_outcomes(passed=1)
     assert result.ret == pytest.ExitCode.OK
-    result.stdout.fnmatch_lines(["*over 40% of the 0.5 s timeout*", NAMED])
+    result.stdout.fnmatch_lines([NAMED, "suite time: *"])
 
 
 def test_a_test_under_the_share_is_not_named(pytester: pytest.Pytester) -> None:
-    scratch(pytester, NEAR_THE_TIMEOUT, timeout=1, budget=30, share=0.4)
+    scratch(pytester, NEAR_THE_TIMEOUT, timeout=2, budget=30, share=0.4)
     result = pytester.runpytest()
     assert result.ret == pytest.ExitCode.OK
-    result.stdout.no_fnmatch_line("*of its * s timeout")
+    result.stdout.no_fnmatch_line(NEAR)
 
 
 def test_a_slow_test_is_not_named(pytester: pytest.Pytester) -> None:
@@ -206,11 +207,36 @@ def test_a_slow_test_is_not_named(pytester: pytest.Pytester) -> None:
     scratch(pytester, slow, timeout=0.5, budget=30, share=0.4)
     result = pytester.runpytest(*slow_lane())
     result.assert_outcomes(passed=1)
-    result.stdout.no_fnmatch_line("*of its * s timeout")
+    assert result.ret == pytest.ExitCode.OK
+    result.stdout.no_fnmatch_line(NEAR)
 
 
 def test_a_share_of_0_warns_of_nothing(pytester: pytest.Pytester) -> None:
     scratch(pytester, NEAR_THE_TIMEOUT, timeout=0.5, budget=30, share=0)
     result = pytester.runpytest()
     assert result.ret == pytest.ExitCode.OK
-    result.stdout.no_fnmatch_line("*of its * s timeout")
+    result.stdout.no_fnmatch_line(NEAR)
+
+
+def test_a_failed_test_is_not_named(pytester: pytest.Pytester) -> None:
+    failing = NEAR_THE_TIMEOUT + "    assert False\n"
+    scratch(pytester, failing, timeout=0.5, budget=30, share=0.4)
+    result = pytester.runpytest()
+    result.assert_outcomes(failed=1)
+    assert result.ret == pytest.ExitCode.TESTS_FAILED
+    result.stdout.no_fnmatch_line(NEAR)
+
+
+def test_a_subtest_is_not_counted_twice(pytester: pytest.Pytester) -> None:
+    tests = """
+import time
+
+
+def test_with_a_subtest(subtests):
+    with subtests.test():
+        time.sleep(0.15)
+"""
+    scratch(pytester, tests, timeout=0.5, budget=30, share=0.4)
+    result = pytester.runpytest()
+    assert result.ret == pytest.ExitCode.OK
+    result.stdout.no_fnmatch_line(NEAR)

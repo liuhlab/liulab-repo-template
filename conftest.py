@@ -2,10 +2,10 @@
 
 `suite_budget` in `[tool.pytest.ini_options]` is the most seconds a run may take, and
 `timeout`, read by pytest-timeout, the most one test may take, setup and teardown included. A
-test that takes more than `timeout_warn_share` of `timeout` is named in the summary, and the run
-still passes, so a slower runner's margin shows before it fails the test. A test marked `slow`
-is held to none of them: the default run deselects it, and a run in which one ran is not timed.
-A `-m slow` run that finds no test marked `slow` passes.
+passing test that takes `near_timeout_share` of `timeout` or more is named in the summary, and
+the run still passes, so a slower runner's margin shows before it fails the test. A test marked
+`slow` is held to none of them: the default run deselects it, and a run in which one ran is not
+timed. A `-m slow` run that finds no test marked `slow` passes.
 """
 
 from __future__ import annotations
@@ -19,6 +19,14 @@ SLOW = "slow"
 
 #: Rides on a `slow` test's reports, which pytest-xdist carries from a worker to the controller.
 SLOW_TAG = (SLOW, True)
+
+#: Rides, the same way, on the reports of a test that `untimed` frees from `timeout`.
+UNTIMED_TAG = ("untimed", True)
+
+
+def untimed(item: pytest.Item) -> bool:
+    """Whether pytest-timeout sets no timer for this test, and so whether it is never near one."""
+    return item.get_closest_marker(SLOW) is not None
 
 
 class SuiteBudget:
@@ -73,32 +81,32 @@ class SuiteBudget:
 
 
 class NearTheTimeout:
-    """Names each test that took more than a share of `timeout`, and never fails the run."""
+    """Names each passing test that took a share of `timeout` or more, and never fails the run."""
 
     def __init__(self, timeout: float, share: float) -> None:
         self.timeout = timeout
-        self.share = share
+        self.threshold = timeout * share
         self.took: dict[str, float] = {}
+        self.failed: set[str] = set()
 
     def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
         """Sum a test's setup, call and teardown, which pytest-timeout times together."""
-        if SLOW_TAG not in report.user_properties:
-            self.took[report.nodeid] = self.took.get(report.nodeid, 0.0) + report.duration
+        # A subtest's report is a subclass, and its time is already inside the call's.
+        if type(report) is not pytest.TestReport or UNTIMED_TAG in report.user_properties:
+            return
+        self.took[report.nodeid] = self.took.get(report.nodeid, 0.0) + report.duration
+        if report.failed:
+            self.failed.add(report.nodeid)
 
     def pytest_terminal_summary(self, terminalreporter: pytest.TerminalReporter) -> None:
-        """Print each test past the share, slowest first."""
-        mark = self.share * self.timeout
-        near = sorted((took, test) for test, took in self.took.items() if took > mark)
-        if not near:
-            return
-        limit = f"{self.timeout:g} s timeout"
-        terminalreporter.write_line(
-            f"near the timeout: over {self.share:.0%} of the {limit}, "
-            "which a slower runner may cross",
-            yellow=True,
-        )
-        for took, test in reversed(near):
-            terminalreporter.write_line(f"  {test}: {took:.2f} s of its {limit}")
+        """Print one line for each test at or above the threshold, slowest first."""
+        for test, took in sorted(self.took.items(), key=lambda pair: pair[1], reverse=True):
+            if took >= self.threshold and test not in self.failed:
+                terminalreporter.write_line(
+                    f"near the timeout: {test} took {took:.2f} s, "
+                    f"at or above {self.threshold:g} s of its {self.timeout:g} s",
+                    yellow=True,
+                )
 
 
 class EmptySlowLane:
@@ -126,7 +134,7 @@ class EmptySlowLane:
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """Register `suite_budget` and `timeout_warn_share`."""
+    """Register `suite_budget` and `near_timeout_share`."""
     parser.addini(
         "suite_budget",
         "Most seconds a run may take; a run in which a slow test ran is not timed. "
@@ -135,8 +143,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=0.0,
     )
     parser.addini(
-        "timeout_warn_share",
-        "Share of timeout past which a test is named in the summary; the run still passes. "
+        "near_timeout_share",
+        "Share of timeout at which a passing test is named in the summary; the run still passes. "
         "0 or unset: no warning.",
         type="float",
         default=0.0,
@@ -149,14 +157,16 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers",
         f"{SLOW}: exempt from the time limits and their warning, and deselected unless -m {SLOW}",
     )
+    if hasattr(config, "workerinput"):
+        return
     budget = config.getini("suite_budget")
-    if budget and not hasattr(config, "workerinput"):
+    if budget:
         config.pluginmanager.register(SuiteBudget(budget), "suite-budget")
-    share = config.getini("timeout_warn_share")
-    timeout = float(config.getini("timeout") or 0) if share else 0
-    if timeout and not hasattr(config, "workerinput"):
+    share = config.getini("near_timeout_share")
+    if share and float(config.getini("timeout") or 0):
+        timeout = float(config.getini("timeout"))
         config.pluginmanager.register(NearTheTimeout(timeout, share), "near-the-timeout")
-    if config.option.markexpr.replace(" ", "") == SLOW and not hasattr(config, "workerinput"):
+    if config.option.markexpr.replace(" ", "") == SLOW:
         config.pluginmanager.register(EmptySlowLane(), "empty-slow-lane")
 
 
@@ -164,13 +174,15 @@ def pytest_configure(config: pytest.Config) -> None:
 def pytest_runtest_makereport(
     item: pytest.Item,
 ) -> Generator[None, pytest.TestReport, pytest.TestReport]:
-    """Tag a `slow` test's report."""
+    """Tag the report of a `slow` test, and of one with no timer."""
     report = yield
     if item.get_closest_marker(SLOW):
         report.user_properties.append(SLOW_TAG)
+    if untimed(item):
+        report.user_properties.append(UNTIMED_TAG)
     return report
 
 
 def pytest_timeout_set_timer(item: pytest.Item) -> bool | None:
-    """Set no timer for a `slow` test; pytest-timeout sets one for every other."""
-    return True if item.get_closest_marker(SLOW) else None
+    """Set no timer for an `untimed` test; pytest-timeout sets one for every other."""
+    return True if untimed(item) else None

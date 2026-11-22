@@ -9,10 +9,12 @@ sets one.
 
 ### Added
 
-- A warning when a test nears its time limit. A test that takes more than
-  `timeout_warn_share` of `timeout` (40% here) is named in the run's summary with its time,
-  and the run still passes, so a slower CI runner's margin shows before it fails the test. A
-  `slow` test is not named. Two of the template's own tests sleep less, to stay under it.
+- A warning when a test nears its time limit. A passing test that takes
+  `near_timeout_share` of `timeout` or more (40% here) is named in the run's summary with its
+  time, and the run still passes, so a slower CI runner's margin shows before it fails the
+  test. A test with no timer, such as a `slow` one, is not named. A repo made earlier can copy
+  `conftest.py` from this one and add `near_timeout_share = 0.4` to its
+  `[tool.pytest.ini_options]`. Two of the template's own tests sleep less, to stay under it.
 - A test that the paragraph `init-repo` cuts from `AGENTS.md` is still that file's text. The
   copy had drifted, so a repo with no tests kept the paragraph.
 - A 15-minute limit on the CI job. A hung job used to run for GitHub's default of 6 hours,
