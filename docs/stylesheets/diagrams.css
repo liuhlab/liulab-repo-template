@@ -1,0 +1,25 @@
+/* Hand-drawn SVG diagrams, inlined into a page inside <figure class="diagram">. */
+
+/* Without this, the figure shrinks to its caption's width, and the diagram's text with it. */
+.md-typeset figure.diagram,
+.md-typeset figure.diagram svg {
+  width: 100%;
+}
+
+/* Colour tokens, used through a class such as `.d-store { stroke: var(--d-store); }`.
+   One token per meaning, defined in both schemes. Add a diagram's own beside these.
+   `:root` too, because a site with no `palette:` sets no scheme attribute. */
+:root,
+[data-md-color-scheme="default"] {
+  --d-text: #212529;
+  --d-fill: #f1f3f5;
+  --d-stroke: #495057;
+  --d-accent: #0b7285;
+}
+
+[data-md-color-scheme="slate"] {
+  --d-text: #e9ecef;
+  --d-fill: #2c313a;
+  --d-stroke: #adb5bd;
+  --d-accent: #66d9e8;
+}
