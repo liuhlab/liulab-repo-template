@@ -1,0 +1,17 @@
+/* Hand-drawn SVG diagrams, inlined into a page inside <figure class="diagram">. */
+
+/* Without this, the figure shrinks to its caption's width, and the diagram's text with it. */
+.md-typeset figure.diagram,
+.md-typeset figure.diagram svg {
+  width: 100%;
+}
+
+/* Colour tokens: one per meaning, set in both schemes, used through a class such as
+   `.d-<meaning> { stroke: var(--d-<meaning>); }`. A repo's first diagram adds its own. */
+[data-md-color-scheme="default"] {
+  /* --d-<meaning>: <colour>; */
+}
+
+[data-md-color-scheme="slate"] {
+  /* --d-<meaning>: <colour>; */
+}

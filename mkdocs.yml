@@ -62,6 +62,11 @@ validation:
 theme:
   name: material
 
+# Paths here run from docs/. The stylesheet makes an SVG diagram's figure full width and is
+# where a diagram's colour tokens go.
+extra_css:
+  - stylesheets/diagrams.css
+
 plugins:
   - search
   - mkdocstrings:
@@ -85,6 +90,11 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.highlight
   - pymdownx.inlinehilite
+  # Inlines a file with a `--8<--` line, such as an SVG diagram; inert until a page has one.
+  # `check_paths` makes a missing file fail the build. Without it, `--strict` passes and the
+  # page shows an empty figure.
+  - pymdownx.snippets:
+      check_paths: true
   - pymdownx.superfences
   - toc:
       permalink: true

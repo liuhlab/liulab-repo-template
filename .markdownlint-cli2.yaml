@@ -33,3 +33,6 @@ config:
   # repeating its own section, which is the duplicate that is a real mistake.
   MD024:
     siblings_only: true
+  # Scoped, not disabled: an inlined SVG diagram needs a raw <figure>. Other inline HTML fails.
+  MD033:
+    allowed_elements: [figure, figcaption]
