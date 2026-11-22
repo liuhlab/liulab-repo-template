@@ -6,12 +6,20 @@
   width: 100%;
 }
 
-/* Colour tokens: one per meaning, set in both schemes, used through a class such as
-   `.d-<meaning> { stroke: var(--d-<meaning>); }`. A repo's first diagram adds its own. */
+/* Colour tokens, used through a class such as `.d-store { stroke: var(--d-store); }`.
+   One token per meaning, defined in both schemes. Add a diagram's own beside these.
+   `:root` too, because a site with no `palette:` sets no scheme attribute. */
+:root,
 [data-md-color-scheme="default"] {
-  /* --d-<meaning>: <colour>; */
+  --d-text: #212529;
+  --d-fill: #f1f3f5;
+  --d-stroke: #495057;
+  --d-accent: #0b7285;
 }
 
 [data-md-color-scheme="slate"] {
-  /* --d-<meaning>: <colour>; */
+  --d-text: #e9ecef;
+  --d-fill: #2c313a;
+  --d-stroke: #adb5bd;
+  --d-accent: #66d9e8;
 }
